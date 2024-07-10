@@ -662,7 +662,7 @@ name = "counter_anchor"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "svm-merkle-tree",
+ "dd-merkle-tree",
 ]
 
 [[package]]
@@ -737,6 +737,24 @@ dependencies = [
  "serde",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "dd-merkle-tree"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd9a6a8ee1c269bc940c25ee8a0bacc7aa6642baab5ce56c05090fcccbc3a425"
+dependencies = [
+ "anchor-lang",
+ "anyhow",
+ "hex",
+ "hex-literal",
+ "rayon",
+ "sha2 0.10.8",
+ "sha3",
+ "solana-program",
+ "thiserror",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1611,23 +1629,6 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
-
-[[package]]
-name = "svm-merkle-tree"
-version = "0.1.1"
-source = "git+https://github.com/MultiAdaptive/svm-merkle-tree#ec8bda2891107d6cff3a385aa1eecb7ac6a29647"
-dependencies = [
- "anchor-lang",
- "anyhow",
- "hex",
- "hex-literal",
- "rayon",
- "sha2 0.10.8",
- "sha3",
- "solana-program",
- "thiserror",
- "wasm-bindgen",
-]
 
 [[package]]
 name = "syn"

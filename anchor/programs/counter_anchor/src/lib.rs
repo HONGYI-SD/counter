@@ -1,7 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 use anchor_lang::prelude::*;
-use svm_merkle_tree::{MerkleTree, HashingAlgorithm};
+use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
 declare_id!("eFQ4aiydTUuhmEYKe4C4jwa1UGGFCUdi2JhrqA3gWy2");
 
