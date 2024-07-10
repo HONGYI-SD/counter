@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("eFQ4aiydTUuhmEYKe4C4jwa1UGGFCUdi2JhrqA3gWy2");
+declare_id!("DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz");
 
 #[program]
 pub mod counter_anchor {
@@ -49,10 +49,10 @@ pub struct InitializeCounter<'info> {
     pub counter: Account<'info, Counter>,
     #[account(
         init,
-        space = 8 + acc_deposit::INIT_SPACE,
+        space = 8 + AccDeposit::INIT_SPACE,
         payer = payer
     )]
-    pub counter2: Account<'info, acc_deposit>,
+    pub deposit_counter: Account<'info, AccDeposit>,
     pub system_program: Program<'info, System>,
 }
 
@@ -71,12 +71,12 @@ pub struct Counter {
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
-    pub accs_deposit: Account<'info, acc_deposit>,
+    pub accs_deposit: Account<'info, AccDeposit>,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct acc_deposit {
+pub struct AccDeposit {
     merkle_root: [u8; 32],
     #[max_len(100)]
     leaf_hashes: Vec<[u8; 32]>,

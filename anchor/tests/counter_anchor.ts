@@ -21,6 +21,7 @@ describe('counter_anchor', () => {
       .initializeCounter()
       .accounts({
         counter: counterKeypair.publicKey,
+        depositCounter: counterKeypair.publicKey,
         payer: payer.publicKey,
       })
       .signers([counterKeypair])
