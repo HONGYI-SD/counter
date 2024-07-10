@@ -13,10 +13,10 @@ pub mod counter_anchor {
         Ok(())
     }
 
-    pub fn increment(ctx: Context<Increment>) -> Result<()> {
-        ctx.accounts.counter.count = ctx.accounts.counter.count.checked_add(1).unwrap();
-        Ok(())
-    }
+    // pub fn increment(ctx: Context<Increment>) -> Result<()> {
+    //     ctx.accounts.counter.count = ctx.accounts.counter.count.checked_add(1).unwrap();
+    //     Ok(())
+    // }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64, addr: String) -> Result<()> {
         let accs_deposit = &mut ctx.accounts.accs_deposit;
@@ -41,12 +41,12 @@ pub struct InitializeCounter<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(
-        init,
-        space = 8 + Counter::INIT_SPACE,
-        payer = payer
-    )]
-    pub counter: Account<'info, Counter>,
+    // #[account(
+    //     init,
+    //     space = 8 + Counter::INIT_SPACE,
+    //     payer = payer
+    // )]
+    // pub counter: Account<'info, Counter>,
     #[account(
         init,
         space = 8 + AccDeposit::INIT_SPACE,
@@ -56,17 +56,17 @@ pub struct InitializeCounter<'info> {
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct Increment<'info> {
-    #[account(mut)]
-    pub counter: Account<'info, Counter>,
-}
+// #[derive(Accounts)]
+// pub struct Increment<'info> {
+//     #[account(mut)]
+//     pub counter: Account<'info, Counter>,
+// }
 
-#[account]
-#[derive(InitSpace)]
-pub struct Counter {
-    count: u64,
-}
+// #[account]
+// #[derive(InitSpace)]
+// pub struct Counter {
+//     count: u64,
+// }
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {

@@ -2,8 +2,8 @@
 seeds = false
 skip-lint = false
 
-[programs.devnet]
-counter_anchor = "DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz"
+# [programs.devnet]
+# counter_anchor = "DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz"
 
 [registry]
 #url = "https://api.apr.dev"
