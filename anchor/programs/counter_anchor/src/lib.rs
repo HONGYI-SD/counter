@@ -7,6 +7,8 @@ declare_id!("DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz");
 
 #[program]
 pub mod counter_anchor {
+    use dd_merkle_tree::MerkleProof;
+
     use super::*;
 
     pub fn initialize_counter(_ctx: Context<InitializeCounter>) -> Result<()> {
@@ -27,6 +29,27 @@ pub mod counter_anchor {
         tree.merklize().unwrap();
         let root = tree.get_merkle_root().unwrap();
         accs_deposit.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        Ok(())
+    }
+
+    pub fn verify_merkle_proof(
+        ctx: Context<Deposit>, 
+        hash_size: u8,
+        leaf_index: u32,
+        proof_hashes: Vec<u8>,
+        leaf_hash: Vec<u8>,
+     ) -> Result<()> {
+        let accs_deposit = &mut ctx.accounts.accs_deposit;
+        // recover the merkle tree
+        let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
+        let pre_leafs = accs_deposit.leaf_hashes.clone().into_iter().map(|arr| arr.to_vec()).collect();
+        tree.add_hashes(pre_leafs).unwrap();
+
+        // recover the proof
+        let proof = MerkleProof::new(HashingAlgorithm::Sha256d, hash_size, leaf_index, proof_hashes);
+        assert_eq!(tree.get_merkle_root().unwrap(), proof.merklize(&leaf_hash).unwrap());
+
+        // todo mint spl token
         Ok(())
     }
 }
