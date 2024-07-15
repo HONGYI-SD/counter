@@ -4,6 +4,7 @@ import { Keypair } from '@solana/web3.js';
 import { assert } from 'chai';
 import type { CounterAnchor } from '../target/types/counter_anchor';
 import BN from 'bn.js';
+import {HashingAlgorithm, MerkleTree} from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 
 describe('counter_anchor', () => {
   // Configure the client to use the local cluster.
@@ -54,6 +55,8 @@ describe('counter_anchor', () => {
     //assert(currentCount.merkleRoot === currentCount.leafHashes[0], 'Expected  count to be 1');
   });
 
+  const merkleTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
+  
   // it('Increment Counter Again', async () => {
   //   await program.methods.increment().accounts({ counter: counterKeypair.publicKey }).rpc();
 
