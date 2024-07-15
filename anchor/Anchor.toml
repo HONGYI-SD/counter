@@ -10,7 +10,7 @@ skip-lint = false
 url = "https://solana-devnet.g.alchemy.com/v2/dx_EaB8ZVmi7hYiAYrXQ20x1GgizekQH"
 
 [provider]
-cluster = "devnet"
+cluster = "https://solana-devnet.g.alchemy.com/v2/dx_EaB8ZVmi7hYiAYrXQ20x1GgizekQH"
 wallet = "~/.config/solana/id.json"
 #skippreflight = true
 

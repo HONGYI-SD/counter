@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz");
+declare_id!("BPngMnY1wRfY8XSimmpmazFGT4FoTA6NrwS2eKiuZv9R");
 
 #[program]
 pub mod counter_anchor {
