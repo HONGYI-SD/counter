@@ -25,10 +25,11 @@ pub mod counter_anchor {
         let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash();
         tree.add_hash(leaf_hash).unwrap();
         // 3. record new leaf and new tree root , output msg
-        accs_deposit.leaf_hashes.push(DepositInfo{addr, amount}.double_hash_array());
+        accs_deposit.leaf_hashes.push(DepositInfo{addr: addr.clone(), amount}.double_hash_array());
         tree.merklize().unwrap();
         let root = tree.get_merkle_root().unwrap();
         accs_deposit.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        emit!(DepositEvent{amount, addr});
         Ok(())
     }
 
@@ -80,6 +81,12 @@ pub struct AccDeposit {
     merkle_root: [u8; 32],
     #[max_len(100)]
     leaf_hashes: Vec<[u8; 32]>,
+}
+
+#[event]
+pub struct DepositEvent {
+    pub amount: u64,
+    pub addr: String,
 }
 
 pub struct DepositInfo {
