@@ -4,6 +4,8 @@ import { Keypair } from '@solana/web3.js';
 import { assert } from 'chai';
 import type { CounterAnchor } from '../target/types/counter_anchor';
 import BN from 'bn.js';
+import { publicKey } from '@coral-xyz/anchor/dist/cjs/utils';
+import bs58 from 'bs58';
 //import {HashingAlgorithm, MerkleTree} from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 
 describe('counter_anchor', () => {
@@ -11,26 +13,27 @@ describe('counter_anchor', () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const payer = provider.wallet as anchor.Wallet;
-
+  
   const program = anchor.workspace.CounterAnchor as Program<CounterAnchor>;
-
   console.log("program id:", program.programId.toString())
-  // Generate a new keypair for the counter account
-  const counterKeypair = new Keypair();
 
+  // const treeKeypair = new Keypair();
+  // console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
+  // const secretKeyString = JSON.stringify(Array.from(treeKeypair.secretKey));
+  // console.log("merkle tree account secretKeyString:", secretKeyString)
+  const secretKeyString = "[142,188,220,69,71,213,0,137,82,222,243,145,215,76,4,13,252,227,44,122,103,23,63,228,45,123,70,156,140,198,249,103,43,66,31,241,175,159,180,247,93,75,215,197,112,146,19,47,146,224,85,2,113,91,23,173,6,144,46,6,89,53,77,104]"
+  const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
+  console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
+
+  /*
   it('Initialize Counter', async () => {
-    // console.log('1111222')
-    // const listenerEvent = program.addEventListener('depositEvent', (event, _slot) => {
-    //   console.log('amount', event.amount);
-    // });
-
     await program.methods
       .initializeCounter()
       .accounts({
-        depositCounter: counterKeypair.publicKey,
+        merkleTree: treeKeypair.publicKey,
         payer: payer.publicKey,
       })
-      .signers([counterKeypair])
+      .signers([treeKeypair])
       .rpc();
     // console.log('33333')  
     // await new Promise((resolve) => setTimeout(resolve, 1000*60*1));
@@ -39,31 +42,31 @@ describe('counter_anchor', () => {
     
     // assert(currentCount.count.toNumber() === 10, 'Expected initialized count to be 0');
   });
-
+*/
+  
   it('Increment Counter', async () => {
     try {
       const depostOp1 = {
         amount: 100,
-        addr: 'DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz',
       }
-      await program.methods.deposit(new BN(depostOp1.amount), depostOp1.addr).accounts({ accsDeposit: counterKeypair.publicKey }).rpc();
+      await program.methods.deposit(new BN(depostOp1.amount), payer.publicKey).accounts({ user: payer.publicKey, merkleTree: treeKeypair.publicKey }).rpc();
   
-      const listenerEvent2 = program.addEventListener("hddEvent", (event, _slot, _sig) => {
-        console.log('hdd amount:', event.amount.toNumber());
+      const listenerEvent2 = program.addEventListener("depositEvent", (event, _slot, _sig) => {
+        console.log('event amount:', event.amount.toNumber());
+        console.log("event addr", event.addr.toString());
       });
       //program.addEventListener()
       const depostOp2 = {
         amount: 101,
-        addr: 'DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz',
       }
-      await program.methods.deposit(new BN(depostOp2.amount), depostOp2.addr).accounts({ accsDeposit: counterKeypair.publicKey }).rpc();
+      await program.methods.deposit(new BN(depostOp2.amount), payer.publicKey).accounts({ user: payer.publicKey, merkleTree: treeKeypair.publicKey }).rpc();
   
   
-      const currentCount = await program.account.accDeposit.fetch(counterKeypair.publicKey);
-      console.log("hdd test root: ", currentCount.merkleRoot)
+      const currentCount = await program.account.merkleTreeAccount.fetch(treeKeypair.publicKey);
+      console.log("hdd test root: ", currentCount.merkleRoot.toString())
       console.log("hdd test leaf number: ", currentCount.leafHashes.length)
-      console.log("hdd test leaf 0: ", currentCount.leafHashes[0])
-      console.log("hdd test leaf 1: ", currentCount.leafHashes[1])
+      console.log("hdd test leaf 0: ", currentCount.leafHashes[0].toString())
+      //console.log("hdd test leaf 1: ", currentCount.leafHashes[1].toString())
   
       await new Promise((resolve) => setTimeout(resolve, 1000*5));
       program.removeEventListener(listenerEvent2);

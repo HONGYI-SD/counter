@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("5jqVXMRusQnbh7soHxacJj6xVnqHJXYp33tz1f2Q6UKE");
+declare_id!("DaZ2Zmh6Fyb9LdZmHTbhdJpKfd1YhjjpaVMYu6Mscm2B");
 
 #[program]
 pub mod counter_anchor {
@@ -11,34 +11,32 @@ pub mod counter_anchor {
 
     use super::*;
 
-    pub fn initialize_counter(ctx: Context<InitializeCounter>) -> Result<()> {
-        let account = &mut ctx.accounts.deposit_counter;
-        account.merkle_root = [0; 32];
-        // let event = DepositEvent{
-        //     amount: 10,
-        //     addr: "ajfeijfia".to_string(),
-        // };
-        // emit!(event);
+    pub fn initialize_counter(ctx: Context<Initialize>) -> Result<()> {
+        let tree = &mut ctx.accounts.merkle_tree;
+        tree.merkle_root = [0; 32];
         Ok(())
     }
 
-    pub fn deposit(ctx: Context<Deposit>, amount: u64, addr: String) -> Result<()> {
-        msg!("amount msg: {}", amount);
-        emit!(HddEvent{amount: 189});
-        let accs_deposit = &mut ctx.accounts.accs_deposit;
+    pub fn deposit(ctx: Context<Deposit>, amount: u64, addr: Pubkey) -> Result<()> {
+        let account_tree = &mut ctx.accounts.merkle_tree;
+
         // 1. recover the merkle tree
         let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        let pre_leafs = accs_deposit.leaf_hashes.clone().into_iter().map(|arr| arr.to_vec()).collect();
+        let pre_leafs = account_tree.leaf_hashes.clone().into_iter().map(|arr| arr.to_vec()).collect();
         tree.add_hashes(pre_leafs).unwrap();
+        
         // 2. add new leaf
         let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash();
         tree.add_hash(leaf_hash).unwrap();
-        // 3. record new leaf and new tree root , output msg
-        accs_deposit.leaf_hashes.push(DepositInfo{addr: addr.clone(), amount}.double_hash_array());
+        
+        // 3. record new leaf and new tree root
+        account_tree.leaf_hashes.push(DepositInfo{addr: addr.clone(), amount}.double_hash_array());
         tree.merklize().unwrap();
         let root = tree.get_merkle_root().unwrap();
-        accs_deposit.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
-        
+        account_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+       
+        // 4. emit event
+        emit!(DepositEvent{amount, addr});
         Ok(())
     }
 
@@ -49,7 +47,7 @@ pub mod counter_anchor {
         proof_hashes: Vec<u8>,
         leaf_hash: Vec<u8>,
      ) -> Result<()> {
-        let accs_deposit = &mut ctx.accounts.accs_deposit;
+        let accs_deposit = &mut ctx.accounts.merkle_tree;
         // recover the merkle tree
         let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
         let pre_leafs = accs_deposit.leaf_hashes.clone().into_iter().map(|arr| arr.to_vec()).collect();
@@ -65,50 +63,50 @@ pub mod counter_anchor {
 }
 
 #[derive(Accounts)]
-pub struct InitializeCounter<'info> {
+pub struct Initialize<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
     #[account(
         init,
-        space = 8 + AccDeposit::INIT_SPACE,
+        space = 8 + MerkleTreeAccount::INIT_SPACE,
         payer = payer
     )]
-    pub deposit_counter: Account<'info, AccDeposit>,
+    pub merkle_tree: Account<'info, MerkleTreeAccount>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
-    pub accs_deposit: Account<'info, AccDeposit>,
+    pub user: Signer<'info>,
+    #[account(mut)]
+    pub merkle_tree: Account<'info, MerkleTreeAccount>,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct AccDeposit {
+pub struct MerkleTreeAccount {
     merkle_root: [u8; 32],
-    #[max_len(100)]
+    #[max_len(100)] // temprary solution
     leaf_hashes: Vec<[u8; 32]>,
-    //event_space: [u8; 8],
 }
 
 #[event]
-pub struct HddEvent {
+pub struct DepositEvent {
     pub amount: u64,
-    //#[index]
-    //pub addr: String,
+    pub addr: Pubkey,
 }
 
 pub struct DepositInfo {
-    addr: String,
+    addr: Pubkey,
     amount: u64,
 }
 
 impl DepositInfo {
     fn to_bytes(&self) -> Vec<u8> {
         let mut m = self.amount.to_le_bytes().to_vec();
-        m.extend_from_slice(self.addr.as_bytes());
+        m.extend_from_slice(&self.addr.to_bytes());
         m
     }
 
