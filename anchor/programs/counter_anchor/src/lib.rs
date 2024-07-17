@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("BPngMnY1wRfY8XSimmpmazFGT4FoTA6NrwS2eKiuZv9R");
+declare_id!("5jqVXMRusQnbh7soHxacJj6xVnqHJXYp33tz1f2Q6UKE");
 
 #[program]
 pub mod counter_anchor {
@@ -11,11 +11,20 @@ pub mod counter_anchor {
 
     use super::*;
 
-    pub fn initialize_counter(_ctx: Context<InitializeCounter>) -> Result<()> {
+    pub fn initialize_counter(ctx: Context<InitializeCounter>) -> Result<()> {
+        let account = &mut ctx.accounts.deposit_counter;
+        account.merkle_root = [0; 32];
+        // let event = DepositEvent{
+        //     amount: 10,
+        //     addr: "ajfeijfia".to_string(),
+        // };
+        // emit!(event);
         Ok(())
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64, addr: String) -> Result<()> {
+        msg!("amount msg: {}", amount);
+        emit!(HddEvent{amount: 189});
         let accs_deposit = &mut ctx.accounts.accs_deposit;
         // 1. recover the merkle tree
         let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
@@ -29,7 +38,7 @@ pub mod counter_anchor {
         tree.merklize().unwrap();
         let root = tree.get_merkle_root().unwrap();
         accs_deposit.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
-        emit!(DepositEvent{amount, addr});
+        
         Ok(())
     }
 
@@ -81,12 +90,14 @@ pub struct AccDeposit {
     merkle_root: [u8; 32],
     #[max_len(100)]
     leaf_hashes: Vec<[u8; 32]>,
+    //event_space: [u8; 8],
 }
 
 #[event]
-pub struct DepositEvent {
+pub struct HddEvent {
     pub amount: u64,
-    pub addr: String,
+    //#[index]
+    //pub addr: String,
 }
 
 pub struct DepositInfo {
