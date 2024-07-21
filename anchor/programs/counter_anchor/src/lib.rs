@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("DoR5FmrtZztTRpaL1WASi6qfFWXruBofbnwNDdgCFi2G");
+declare_id!("6fXWMHeqiJNC8rwNom5d7GLNFrqsDKzWpzs7Ee6rVtmg");
 
 #[program]
 pub mod counter_anchor {
@@ -36,7 +36,8 @@ pub mod counter_anchor {
         account_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
        
         // 4. emit event
-        emit!(DepositEvent{amount, addr});
+        let index :u64 = account_tree.leaf_hashes.len().try_into().unwrap(); 
+        emit!(DepositEvent{amount, addr, index});
 
         msg!("amount:{}", amount);
         if amount == 101 {
@@ -128,6 +129,7 @@ pub struct MerkleTreeAccount {
 pub struct DepositEvent {
     pub amount: u64,
     pub addr: Pubkey,
+    pub index: u64,
 }
 
 pub struct DepositInfo {

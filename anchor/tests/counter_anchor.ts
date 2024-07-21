@@ -21,7 +21,7 @@ describe('counter_anchor', () => {
   // console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
   // const secretKeyString = JSON.stringify(Array.from(treeKeypair.secretKey));
   // console.log("merkle tree account secretKeyString:", secretKeyString)
-  const secretKeyString = "[22,29,106,33,158,97,31,23,194,227,49,5,217,199,208,78,254,52,49,95,122,81,107,159,215,94,80,91,232,150,60,95,135,155,64,5,189,251,156,250,145,47,46,131,27,48,189,179,19,235,45,254,14,114,69,69,65,231,162,231,225,116,136,60]"
+  const secretKeyString = "[38,15,32,78,53,174,30,196,44,155,48,74,66,71,101,22,54,211,147,191,188,86,127,47,229,45,168,194,199,161,69,220,247,207,159,239,240,27,118,78,101,143,181,41,10,83,243,62,14,57,193,27,90,183,127,66,54,219,229,187,52,70,131,147]"
   const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
 
@@ -32,9 +32,10 @@ describe('counter_anchor', () => {
       
 
       //const encoder = new TextEncoder();
-      let eventCounter:number = 0;
+      //let eventCounter:number = 0;
       const listenerEvent2 = program.addEventListener("depositEvent", async (event, _slot, _sig) => {
-        console.log("eventCounter: ", eventCounter);
+        const eventIdx = event.index.toNumber() - 1;
+        console.log("event index: ", eventIdx);
         console.log('event amount:', event.amount.toNumber());
         console.log("event addr", event.addr.toString());
         
@@ -53,8 +54,8 @@ describe('counter_anchor', () => {
         localTree.merklize();
         console.log("new root:", localTree.get_merkle_root());
         //console.log("local tree: ", localTree)
-        if (eventCounter > 0) {
-          const proof: MerkleProof = localTree.merkle_proof_index(eventCounter);
+        if (eventIdx > 0) {
+          const proof: MerkleProof = localTree.merkle_proof_index(eventIdx);
           console.log("pairing hashes: ", proof.get_pairing_hashes());
           console.log("pairing hashes length: ", proof.get_pairing_hashes().length);
           //proof.merklize_hash(localTree.)
@@ -65,13 +66,13 @@ describe('counter_anchor', () => {
 
           // send to verify
           let proof_hashes = proof.get_pairing_hashes();
-          await program.methods.verifyMerkleProof(new BN(event.amount), event.addr, eventCounter, Buffer.from(proof_hashes)).accounts({ user: payer.publicKey, merkleTree: treeKeypair.publicKey }).rpc();
+          await program.methods.verifyMerkleProof(new BN(event.amount), event.addr, eventIdx, Buffer.from(proof_hashes)).accounts({ user: payer.publicKey, merkleTree: treeKeypair.publicKey }).rpc();
           console.log("over !!!");
           //program.removeEventListener(listenerEvent2);
 
         }
 
-        eventCounter++;
+        //eventCounter++;
 
       });
 
@@ -90,7 +91,7 @@ describe('counter_anchor', () => {
       console.log("hdd test root: ", currentCount.merkleRoot.toString())
       console.log("hdd test leaf number: ", currentCount.leafHashes.length)
       // console.log("hdd test leaf 0: ", currentCount.leafHashes[0].toString())
-      console.log("hdd test leaf 1: ", currentCount.leafHashes[1].toString())
+      // console.log("hdd test leaf 1: ", currentCount.leafHashes[1].toString())
 
       await new Promise((resolve) => setTimeout(resolve, 1000*5));
       program.removeEventListener(listenerEvent2);
