@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("2qcqrHWLRWTLCXXQaCzyvpK8Z1SftvxjRkajKd58bFWu");
+declare_id!("DoR5FmrtZztTRpaL1WASi6qfFWXruBofbnwNDdgCFi2G");
 
 #[program]
 pub mod counter_anchor {
@@ -37,6 +37,15 @@ pub mod counter_anchor {
        
         // 4. emit event
         emit!(DepositEvent{amount, addr});
+
+        msg!("amount:{}", amount);
+        if amount == 101 {
+            msg!("proof hashes:{:?}", tree.merkle_proof_index(1).unwrap().get_pairing_hashes());
+            // let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, 1, tree.merkle_proof_index(1).unwrap().get_pairing_hashes());
+            // let leaf_hash = DepositInfo{addr: user_addr, amount: deposit_amount}.double_hash_array();
+            // proof.merklize(leaf)
+        }
+        
         Ok(())
     }
 
@@ -55,13 +64,16 @@ pub mod counter_anchor {
         let accs_deposit = &mut ctx.accounts.merkle_tree;
         //accs_deposit.merkle_root = [0; 32];
         // recover the proof
-        msg!("step 1");
+        msg!("step 1, merkle root:{:?}", accs_deposit.merkle_root);
         let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, proof_index, proof_hashes);
-        msg!("step 2");
+        msg!("step 2, proof: {:?}", proof.get_pairing_hashes());
         let leaf_hash = DepositInfo{addr: user_addr, amount: deposit_amount}.double_hash_array();
-        //msg!("step 3, leaf_hash: {:?}", leaf_hash);
-        let tmp_root = proof.merklize(&leaf_hash).unwrap();
-        //msg!("step 4, tmp_root: {:?}, len: {}", tmp_root, tmp_root.len());
+        msg!("step 3, leaf_hash: {:?}", leaf_hash);
+        let tmp_root = proof.merklize_hash(&leaf_hash).unwrap();
+        msg!("step 4, tmp_root: {:?}", tmp_root);
+        msg!("step 4.1, tmp_root len: {}", tmp_root.len());
+        //Ok(())
+
         assert_eq!(32, tmp_root.len());
         //msg!("step 5");
         let mut proof_root = [0u8; 32];
@@ -72,6 +84,7 @@ pub mod counter_anchor {
         //msg!("step 6");
         // todo mint spl token
         Ok(())
+
     }
 }
 
