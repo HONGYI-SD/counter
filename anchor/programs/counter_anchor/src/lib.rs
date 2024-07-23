@@ -39,14 +39,6 @@ pub mod counter_anchor {
         let index :u64 = account_tree.leaf_hashes.len().try_into().unwrap(); 
         emit!(DepositEvent{amount, addr, index});
 
-        msg!("amount:{}", amount);
-        if amount == 101 {
-            msg!("proof hashes:{:?}", tree.merkle_proof_index(1).unwrap().get_pairing_hashes());
-            // let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, 1, tree.merkle_proof_index(1).unwrap().get_pairing_hashes());
-            // let leaf_hash = DepositInfo{addr: user_addr, amount: deposit_amount}.double_hash_array();
-            // proof.merklize(leaf)
-        }
-        
         Ok(())
     }
 
@@ -63,26 +55,18 @@ pub mod counter_anchor {
         msg!("proof_hashes: {:?}", proof_hashes);
         
         let accs_deposit = &mut ctx.accounts.merkle_tree;
-        //accs_deposit.merkle_root = [0; 32];
-        // recover the proof
-        msg!("step 1, merkle root:{:?}", accs_deposit.merkle_root);
-        let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, proof_index, proof_hashes);
-        msg!("step 2, proof: {:?}", proof.get_pairing_hashes());
-        let leaf_hash = DepositInfo{addr: user_addr, amount: deposit_amount}.double_hash_array();
-        msg!("step 3, leaf_hash: {:?}", leaf_hash);
-        let tmp_root = proof.merklize_hash(&leaf_hash).unwrap();
-        msg!("step 4, tmp_root: {:?}", tmp_root);
-        msg!("step 4.1, tmp_root len: {}", tmp_root.len());
-        //Ok(())
 
+        // recover the proof
+        let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, proof_index, proof_hashes);
+        let leaf_hash = DepositInfo{addr: user_addr, amount: deposit_amount}.double_hash_array();
+        let tmp_root = proof.merklize_hash(&leaf_hash).unwrap();
+
+        // check proof root
         assert_eq!(32, tmp_root.len());
-        //msg!("step 5");
         let mut proof_root = [0u8; 32];
         proof_root.copy_from_slice(&tmp_root);
-        //msg!("merkle_root: {:?}", accs_deposit.merkle_root);
-        //msg!("proof_root: {:?}", proof_root);
         assert_eq!(accs_deposit.merkle_root, proof_root);
-        //msg!("step 6");
+
         // todo mint spl token
         Ok(())
 
@@ -118,12 +102,6 @@ pub struct MerkleTreeAccount {
     #[max_len(100)] // temprary solution
     leaf_hashes: Vec<[u8; 32]>,
 }
-
-// impl MerkleTreeAccount {
-//     fn get_merkle_root(&self) -> [u8; 32] {
-//         return self.m
-//     }
-// }
 
 #[event]
 pub struct DepositEvent {
