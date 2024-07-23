@@ -22,8 +22,8 @@ pub mod counter_anchor {
 
         // 1. recover the merkle tree
         let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        let pre_leafs = account_tree.leaf_hashes.clone().into_iter().map(|arr| arr.to_vec()).collect();
-        tree.add_hashes(pre_leafs).unwrap();
+        let pre_leaf_hashes = account_tree.leaf_hashes.clone().into_iter().map(|arr| arr.to_vec()).collect();
+        tree.add_hashes(pre_leaf_hashes).unwrap();
         
         // 2. add new leaf
         let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash();
