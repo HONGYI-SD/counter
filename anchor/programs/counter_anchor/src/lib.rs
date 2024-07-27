@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("BZBQrckAhCoKLDiCY8M3UdZT1cuNPo45cFaaMTxkE6Wn");
+declare_id!("E9QoJuZgdF7Zv84kePS6nwZPmeWbMnA12kCfocZDr3ak");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
@@ -16,7 +16,7 @@ pub mod counter_anchor {
     pub fn initialize_counter(ctx: Context<Initialize>) -> Result<()> {
         let tree = &mut ctx.accounts.merkle_tree;
         tree.merkle_root = [0; 32];
-        tree.chunk_count = 0;
+        tree.chunk_count = 0u64;
         Ok(())
     }
 
@@ -40,20 +40,21 @@ pub mod counter_anchor {
             merkle_tree.chunk_count += 1;
         }
 
-        let mut all_leaves:Vec<[u8; 32]> = Vec::new();
+        //let mut all_leaves:Vec<[u8; 32]> = Vec::new();
         for i in 0..= chunk_index {
             let leaf_account_info = ctx.remaining_accounts.get(i as usize).unwrap();
-            let leaf_account_data: Account<LeafAccount> = Account::try_from(leaf_account_info)?;
-            msg!("index: {}, leaf_hashes: {:?}", i, leaf_account_data.leaf_hashes.clone());
-            all_leaves.extend(leaf_account_data.leaf_hashes.clone());
+            msg!("leaf account: {:?}, {:?}", i, leaf_account_info.key().to_string());
+            // let leaf_account_data: Account<LeafAccount> = Account::try_from(leaf_account_info)?;
+            // msg!("index: {}, leaf_hashes: {:?}", i, leaf_account_data.leaf_hashes.clone());
+            // all_leaves.extend(leaf_account_data.leaf_hashes.clone());
         }
 
-        let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        tree.add_hashes(all_leaves.into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        // let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
+        // tree.add_hashes(all_leaves.into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
 
-        tree.merklize().unwrap();
-        let root = tree.get_merkle_root().unwrap();
-        merkle_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        // tree.merklize().unwrap();
+        // let root = tree.get_merkle_root().unwrap();
+        // merkle_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
        
         let index :u64 = 0; 
         emit!(DepositEvent{amount, addr, index});
@@ -116,9 +117,9 @@ pub struct Deposit<'info> {
     #[account(
         init_if_needed, 
         payer = user, 
-        space = 8 + 4 + CHUNK_SIZE * 32, 
-        //seeds = [b"leaf", merkle_tree.key().as_ref(), chunk_index.to_be_bytes().as_ref()],
-        seeds = [b"leaf", merkle_tree.key().as_ref()],
+        space = 8 + LeafAccount::INIT_SPACE, 
+        seeds = [b"leaf", merkle_tree.key().as_ref(), &merkle_tree.chunk_count.to_le_bytes()],
+        //seeds = [b"leaf", merkle_tree.key().as_ref()],
         bump)
     ]
     pub leaf: Account<'info, LeafAccount>,
@@ -134,7 +135,9 @@ pub struct MerkleTreeAccount {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct LeafAccount {
+    #[max_len(CHUNK_SIZE)]
     pub leaf_hashes: Vec<[u8; 32]>,
 }
 

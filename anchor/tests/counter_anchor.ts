@@ -24,7 +24,7 @@ describe('counter_anchor', () => {
   // console.log("merkle tree account secretKeyString:", secretKeyString)
 
   const secretKeyString = 
-  "[153,147,139,114,214,24,143,233,60,29,194,226,113,116,109,122,26,205,151,61,48,152,188,118,146,61,97,9,32,164,254,222,72,122,146,68,177,114,89,10,18,219,21,250,111,131,106,36,241,32,21,225,44,30,171,189,67,200,84,98,247,82,3,77]"
+  "[229,29,200,21,27,12,122,202,127,218,228,18,247,240,213,250,245,224,75,161,0,149,240,24,245,251,58,145,227,85,37,196,153,85,72,158,32,226,210,184,79,136,241,167,25,32,90,61,144,8,204,203,46,220,98,121,100,209,164,134,84,65,154,168]"
   const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
 
@@ -81,18 +81,18 @@ describe('counter_anchor', () => {
       // buf.writeBigInt64LE(10);
 
       const chunkCount = 1;
-      const chunkBuffer = Buffer.alloc(8);
-      chunkBuffer.writeBigUInt64BE(BigInt(chunkCount), 0);
+      // const chunkBuffer = Buffer.alloc(8);
+      // chunkBuffer.writeBigUInt64BE(BigInt(chunkCount), 0);
 
       const leafPda1 = anchor.web3.PublicKey.findProgramAddressSync(
         [
         Buffer.from("leaf"),
         treeKeypair.publicKey.toBuffer(),
-        //chunkBuffer
+        new BN(chunkCount).toArrayLike(Buffer, 'le', 8)
       ],
         program.programId
       );
-      console.log("bump", leafPda1[1]);
+      console.log("pda", leafPda1[0].toString());
       await program.methods.deposit(new BN(depostOp1.amount), payer.publicKey)
       .accounts({ user: payer.publicKey, merkleTree: treeKeypair.publicKey, leaf: leafPda1[0] })
       .remainingAccounts(await getRemainingLeafAccounts(program, treeKeypair.publicKey))
@@ -123,10 +123,10 @@ async function getRemainingLeafAccounts(program, merkleTreePda) {
   console.log("chunkCount:", merkleTreeAccount.chunkCount);
   const remainingAccounts = [];
   for (let i = 0; i <= merkleTreeAccount.chunkCount; i++) {
-      const chunkBuffer = Buffer.alloc(8);
-      chunkBuffer.writeBigUInt64BE(BigInt(i), 0);
+      // const chunkBuffer = Buffer.alloc(8);
+      // chunkBuffer.writeBigUInt64BE(BigInt(i), 0);
       const [leafPda, _] =  anchor.web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("leaf"), merkleTreePda.toBuffer()],
+          [Buffer.from("leaf"), merkleTreePda.toBuffer(), new BN(i).toArrayLike(Buffer, 'le', 8)],
           program.programId
       );
       console.log("hdd leafPda:", leafPda);
