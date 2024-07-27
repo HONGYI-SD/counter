@@ -26,6 +26,13 @@ describe('counter_anchor', () => {
 //   const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
 //   console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
 
+  // const payerKeypair = Keypair.fromSecretKey(payer.payer.secretKey);
+  // const [merkleTreePda, _] = anchor.web3.PublicKey.findProgramAddressSync(
+  //   [Buffer.from("merkle_tree")],
+  //   program.programId
+  // );
+  // console.log("merkleTreePda: ", merkleTreePda.toString());
+
   it('Initialize Counter', async () => {
     await program.methods
       .initializeCounter()
@@ -35,12 +42,6 @@ describe('counter_anchor', () => {
       })
       .signers([treeKeypair])
       .rpc();
-    // console.log('33333')  
-    // await new Promise((resolve) => setTimeout(resolve, 1000*60*1));
-    // program.removeEventListener(listenerEvent);
-    // const currentCount = await program.account.accDeposit.fetch(counterKeypair.publicKey);
-    
-    // assert(currentCount.count.toNumber() === 10, 'Expected initialized count to be 0');
   });
 
 });

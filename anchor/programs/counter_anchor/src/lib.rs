@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("BeJUiEz64GzTcwJAW4t1nAVLwwHttjDSVoC4iW1w2ML1");
+declare_id!("BZBQrckAhCoKLDiCY8M3UdZT1cuNPo45cFaaMTxkE6Wn");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
@@ -21,9 +21,13 @@ pub mod counter_anchor {
     }
 
     pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64, addr: Pubkey) -> Result<()> {
+        //return Ok(());
+
         let merkle_tree = &mut ctx.accounts.merkle_tree;
         let chunk_index = merkle_tree.chunk_count;
-        let leaf_account = &mut ctx.accounts.leaf_account;
+        let leaf_account = &mut ctx.accounts.leaf;
+        
+        //leaf_account.bump = ctx.bumps.leaf;
 
         if leaf_account.leaf_hashes.len() >= CHUNK_SIZE {
             return Err(ErrorCode::ChunkFull.into());
@@ -102,25 +106,31 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
+
+//#[instruction(chunk_index: u64)]
 #[derive(Accounts)]
-#[instruction(chunk_index: u32)]
 pub struct Deposit<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
+    #[account(
+        init_if_needed, 
+        payer = user, 
+        space = 8 + 4 + CHUNK_SIZE * 32, 
+        //seeds = [b"leaf", merkle_tree.key().as_ref(), chunk_index.to_be_bytes().as_ref()],
+        seeds = [b"leaf", merkle_tree.key().as_ref()],
+        bump)
+    ]
+    pub leaf: Account<'info, LeafAccount>,
     #[account(mut)]
     pub merkle_tree: Account<'info, MerkleTreeAccount>,
-    #[account(init_if_needed, payer = user, space = 8 + 4 + CHUNK_SIZE * 32, seeds = [b"leaf", merkle_tree.key().as_ref(), &chunk_index.to_le_bytes()], bump)]
-    pub leaf_account: Account<'info, LeafAccount>,
 }
 
 #[account]
 #[derive(InitSpace)]
 pub struct MerkleTreeAccount {
     pub merkle_root: [u8; 32],
-    pub chunk_count: u32,
-    // #[max_len(100)] // temprary solution
-    // leaf_hashes: Vec<[u8; 32]>,
+    pub chunk_count: u64,
 }
 
 #[account]
