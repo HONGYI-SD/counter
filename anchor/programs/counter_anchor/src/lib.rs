@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("E9QoJuZgdF7Zv84kePS6nwZPmeWbMnA12kCfocZDr3ak");
+declare_id!("5UiKzjUD4QczfzqenzDoEgawiGeKpgsMAgt1Uskbu7hb");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
@@ -17,6 +17,14 @@ pub mod counter_anchor {
         let tree = &mut ctx.accounts.merkle_tree;
         tree.merkle_root = [0; 32];
         tree.chunk_count = 0u64;
+        tree.leaf_count = 0u64;
+        Ok(())
+    }
+
+    pub fn view<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, _amount: u64, _addr: Pubkey) -> Result<()> {
+        let leaf_account_info = ctx.remaining_accounts.get(0).unwrap();
+        let leaf_account_data: Account<LeafChunkAccount> = Account::try_from(leaf_account_info)?;
+        msg!("leaf hashes: {:?}", leaf_account_data.leaf_hashes);
         Ok(())
     }
 
@@ -24,40 +32,46 @@ pub mod counter_anchor {
         //return Ok(());
 
         let merkle_tree = &mut ctx.accounts.merkle_tree;
-        let chunk_index = merkle_tree.chunk_count;
+        let chunk_count = merkle_tree.chunk_count;
         let leaf_account = &mut ctx.accounts.leaf;
         
-        //leaf_account.bump = ctx.bumps.leaf;
-
         if leaf_account.leaf_hashes.len() >= CHUNK_SIZE {
             return Err(ErrorCode::ChunkFull.into());
         }
 
         let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash_array();
         leaf_account.leaf_hashes.push(leaf_hash);
-
+        //msg!("deposit:{:?}", leaf_account.leaf_hashes);
         if leaf_account.leaf_hashes.len() == CHUNK_SIZE {
             merkle_tree.chunk_count += 1;
         }
 
-        //let mut all_leaves:Vec<[u8; 32]> = Vec::new();
-        for i in 0..= chunk_index {
-            let leaf_account_info = ctx.remaining_accounts.get(i as usize).unwrap();
-            msg!("leaf account: {:?}, {:?}", i, leaf_account_info.key().to_string());
-            // let leaf_account_data: Account<LeafAccount> = Account::try_from(leaf_account_info)?;
-            // msg!("index: {}, leaf_hashes: {:?}", i, leaf_account_data.leaf_hashes.clone());
-            // all_leaves.extend(leaf_account_data.leaf_hashes.clone());
+        let mut all_leaves:Vec<[u8; 32]> = Vec::new();
+
+        // load pre pda leaf_hashes
+        if chunk_count  > 0 {
+            for i in 0..= (chunk_count-1) {
+                let leaf_pda_item = ctx.remaining_accounts.get(i as usize).unwrap();
+                msg!("leaf account: {:?}, {:?}", i, leaf_pda_item.key().to_string());
+                let leaf_chunk_account_item: Account<LeafChunkAccount> = Account::try_from(leaf_pda_item)?;
+                msg!("index: {}, leaf_hashes: {:?}", i, leaf_chunk_account_item.leaf_hashes.clone());
+                all_leaves.extend(leaf_chunk_account_item.leaf_hashes.clone());
+            }
         }
+        // load current pda leaf_hashes
+        all_leaves.extend(leaf_account.leaf_hashes.clone());
+        let mut leaf_count :u64 = all_leaves.len().try_into().unwrap(); 
+        leaf_count -= 1;
 
-        // let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        // tree.add_hashes(all_leaves.into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
+        tree.add_hashes(all_leaves.into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
 
-        // tree.merklize().unwrap();
-        // let root = tree.get_merkle_root().unwrap();
-        // merkle_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        tree.merklize().unwrap();
+        let root = tree.get_merkle_root().unwrap();
+        merkle_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        merkle_tree.leaf_count = leaf_count;
        
-        let index :u64 = 0; 
-        emit!(DepositEvent{amount, addr, index});
+        emit!(DepositEvent{amount, addr, leaf_count});
 
         Ok(())
     }
@@ -108,7 +122,6 @@ pub struct Initialize<'info> {
 }
 
 
-//#[instruction(chunk_index: u64)]
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
@@ -117,12 +130,11 @@ pub struct Deposit<'info> {
     #[account(
         init_if_needed, 
         payer = user, 
-        space = 8 + LeafAccount::INIT_SPACE, 
+        space = 8 + LeafChunkAccount::INIT_SPACE, 
         seeds = [b"leaf", merkle_tree.key().as_ref(), &merkle_tree.chunk_count.to_le_bytes()],
-        //seeds = [b"leaf", merkle_tree.key().as_ref()],
         bump)
     ]
-    pub leaf: Account<'info, LeafAccount>,
+    pub leaf: Account<'info, LeafChunkAccount>,
     #[account(mut)]
     pub merkle_tree: Account<'info, MerkleTreeAccount>,
 }
@@ -132,11 +144,12 @@ pub struct Deposit<'info> {
 pub struct MerkleTreeAccount {
     pub merkle_root: [u8; 32],
     pub chunk_count: u64,
+    pub leaf_count: u64,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct LeafAccount {
+pub struct LeafChunkAccount {
     #[max_len(CHUNK_SIZE)]
     pub leaf_hashes: Vec<[u8; 32]>,
 }
@@ -145,7 +158,7 @@ pub struct LeafAccount {
 pub struct DepositEvent {
     pub amount: u64,
     pub addr: Pubkey,
-    pub index: u64,
+    pub leaf_count: u64,
 }
 
 #[error_code]
@@ -180,16 +193,3 @@ impl DepositInfo {
         array
     }
 }
-
-// fn collet_all_leaves(ctx: &Context<Deposit>) -> Result<Vec<[u8; 32]>> {
-//     let mut all_leaves = Vec::new();
-
-//     for chunk_index in 0..=ctx.accounts.merkle_tree.chunk_count {
-//         let leaf_account = &ctx.remaining_accounts[chunk_index as usize];
-//         let leaf_account_data: Account<LeafAccount> = Account::try_from(leaf_account)?;
-
-//         all_leaves.extend(leaf_account_data.leaf_hashes.clone());
-//     }
-
-//     Ok(all_leaves)
-// }
