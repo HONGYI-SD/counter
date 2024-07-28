@@ -25,7 +25,7 @@ describe('counter_anchor', () => {
   // console.log("merkle tree account secretKeyString:", secretKeyString)
 
   const secretKeyString = 
-  "[118,147,251,99,28,194,26,5,123,205,43,230,185,172,5,155,5,91,18,119,123,214,61,73,53,167,190,195,81,141,5,228,2,53,165,233,251,206,127,123,189,127,211,206,56,250,242,59,22,66,135,26,138,189,141,146,115,8,42,171,24,96,225,172]"
+  "[38,163,242,1,145,220,162,102,70,217,190,207,40,183,228,107,205,158,136,117,177,210,134,165,108,245,100,85,34,17,162,248,240,170,176,110,237,4,238,213,162,45,202,200,77,135,118,86,252,158,55,11,175,172,188,112,159,94,17,150,199,7,31,18]"
   const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
 
@@ -67,11 +67,11 @@ describe('counter_anchor', () => {
         // }
       });
 
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 1000; i++) {
         const ret = await sendDeposit(program, treeKeypair, payer, i);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000*5));
+      await new Promise((resolve) => setTimeout(resolve, 1000*60*30));
       program.removeEventListener(listenerEvent2);
     } catch (error) {
       console.log('error:', error.toString())
@@ -110,7 +110,7 @@ async function getRemainingLeafAccounts(program: Program<CounterAnchor>, merkleT
           [Buffer.from("leaf"), merkleTreePda.toBuffer(), new BN(i).toArrayLike(Buffer, 'le', 8)],
           program.programId
       );
-      console.log("hdd leafPda:", leafPda);
+      //console.log("hdd leafPda:", leafPda);
       remainingAccounts.push({
           pubkey: leafPda,
           isSigner: false,
