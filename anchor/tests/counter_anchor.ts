@@ -9,7 +9,7 @@ import bs58 from 'bs58';
 import { HashingAlgorithm, MerkleTree, MerkleProof } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 import { SYSTEM_PROGRAM_ID } from '@coral-xyz/anchor/dist/cjs/native/system';
 
-const CHUNK_SIZE = 10;
+const CHUNK_SIZE = 100;
 describe('counter_anchor', () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -25,7 +25,7 @@ describe('counter_anchor', () => {
   // console.log("merkle tree account secretKeyString:", secretKeyString)
 
   const secretKeyString = 
-  "[38,163,242,1,145,220,162,102,70,217,190,207,40,183,228,107,205,158,136,117,177,210,134,165,108,245,100,85,34,17,162,248,240,170,176,110,237,4,238,213,162,45,202,200,77,135,118,86,252,158,55,11,175,172,188,112,159,94,17,150,199,7,31,18]"
+  "[204,58,53,180,14,6,88,85,223,73,128,59,199,118,4,206,100,74,156,183,157,171,99,24,132,119,139,17,234,48,42,70,203,97,170,223,243,228,127,199,152,93,104,26,62,227,95,231,49,78,151,236,253,202,129,146,97,233,17,238,219,167,224,205]"
   const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
 
