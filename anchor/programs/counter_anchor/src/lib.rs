@@ -1,6 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
 declare_id!("5UiKzjUD4QczfzqenzDoEgawiGeKpgsMAgt1Uskbu7hb");
@@ -14,10 +15,16 @@ pub mod counter_anchor {
     use super::*;
 
     pub fn initialize_counter(ctx: Context<Initialize>) -> Result<()> {
-        let tree = &mut ctx.accounts.merkle_tree;
-        tree.merkle_root = [0; 32];
-        tree.chunk_count = 0u64;
-        tree.leaf_count = 0u64;
+        let summary = &mut ctx.accounts.summary;
+        summary.leaf_chunk_count = 0u64;
+        summary.leaf_count = 0u64;
+        Ok(())
+    }
+
+    pub fn increase_summary_account_space(
+        _ctx: Context<IncreaseSummaryAccount>,
+        _len: u32
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -29,8 +36,8 @@ pub mod counter_anchor {
     }
 
     pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64, addr: Pubkey) -> Result<()> {
-        let merkle_tree = &mut ctx.accounts.merkle_tree;
-        let chunk_count = merkle_tree.chunk_count;
+        let summary = &mut ctx.accounts.summary;
+        let chunk_count = summary.leaf_chunk_count;
         let leaf_account = &mut ctx.accounts.leaf;
         
         if leaf_account.leaf_hashes.len() >= CHUNK_SIZE {
@@ -40,7 +47,7 @@ pub mod counter_anchor {
         let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash_array();
         leaf_account.leaf_hashes.push(leaf_hash);
         if leaf_account.leaf_hashes.len() == CHUNK_SIZE {
-            merkle_tree.chunk_count += 1;
+            summary.leaf_chunk_count += 1;
         }
 
         let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
@@ -66,8 +73,8 @@ pub mod counter_anchor {
 
         tree.merklize().unwrap();
         let root = tree.get_merkle_root().unwrap();
-        merkle_tree.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
-        merkle_tree.leaf_count = leaf_count;
+        //summary.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        summary.leaf_count = leaf_count;
        
         emit!(DepositEvent{amount, addr, leaf_count});
 
@@ -86,7 +93,7 @@ pub mod counter_anchor {
         msg!("proof_index: {}", proof_index);
         msg!("proof_hashes: {:?}", proof_hashes);
         
-        let accs_deposit = &mut ctx.accounts.merkle_tree;
+        let accs_deposit = &mut ctx.accounts.summary;
 
         // recover the proof
         let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, proof_index, proof_hashes);
@@ -97,7 +104,7 @@ pub mod counter_anchor {
         assert_eq!(32, tmp_root.len());
         let mut proof_root = [0u8; 32];
         proof_root.copy_from_slice(&tmp_root);
-        assert_eq!(accs_deposit.merkle_root, proof_root);
+        //assert_eq!(accs_deposit.merkle_root, proof_root);
 
         // todo mint spl token
         Ok(())
@@ -112,10 +119,10 @@ pub struct Initialize<'info> {
 
     #[account(
         init,
-        space = 8 + MerkleTreeAccount::INIT_SPACE,
+        space = 8 + SummaryAccount::INIT_SPACE,
         payer = payer
     )]
-    pub merkle_tree: Account<'info, MerkleTreeAccount>,
+    pub summary: Account<'info, SummaryAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -129,20 +136,34 @@ pub struct Deposit<'info> {
         init_if_needed, 
         payer = user, 
         space = 8 + LeafChunkAccount::INIT_SPACE, 
-        seeds = [b"leaf", merkle_tree.key().as_ref(), &merkle_tree.chunk_count.to_le_bytes()],
+        seeds = [b"leaf", summary.key().as_ref(), &summary.leaf_chunk_count.to_le_bytes()],
         bump)
     ]
     pub leaf: Account<'info, LeafChunkAccount>,
     #[account(mut)]
-    pub merkle_tree: Account<'info, MerkleTreeAccount>,
+    pub summary: Account<'info, SummaryAccount>,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct MerkleTreeAccount {
-    pub merkle_root: [u8; 32],
-    pub chunk_count: u64,
+pub struct SummaryAccount {
+    pub leaf_chunk_accounts: [u8; 10232], //1024 * 10 -8, init space , will realloc later
+    pub leaf_chunk_count: u64,
     pub leaf_count: u64,
+}
+
+#[derive(Accounts)]
+#[instruction(len: u32)]
+pub struct IncreaseSummaryAccount<'info> {
+    #[account(mut, 
+        realloc = len as usize, 
+        realloc::zero = true, 
+        realloc::payer=signer)]
+    pub summary: Account<'info, SummaryAccount>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(address = system_program::ID)]
+    pub system_program: Program<'info, System>,
 }
 
 #[account]
@@ -150,6 +171,8 @@ pub struct MerkleTreeAccount {
 pub struct LeafChunkAccount {
     #[max_len(CHUNK_SIZE)]
     pub leaf_hashes: Vec<[u8; 32]>,
+    pub root: [u8; 32],
+    pub is_fulled: bool,
 }
 
 #[event]
