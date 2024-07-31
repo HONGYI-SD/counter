@@ -37,7 +37,7 @@ describe('counter_anchor', () => {
     await program.methods
       .initializeCounter()
       .accounts({
-        merkleTree: treeKeypair.publicKey,
+        summary: treeKeypair.publicKey,
         payer: payer.publicKey,
       })
       .signers([treeKeypair])

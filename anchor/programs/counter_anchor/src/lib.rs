@@ -4,9 +4,9 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("5UiKzjUD4QczfzqenzDoEgawiGeKpgsMAgt1Uskbu7hb");
+declare_id!("5niitNYYWZaoP6uTwMQvwsKPhHGgb6MKw6EBMJtnY8Jf");
 
-const CHUNK_SIZE: usize = 100; // temp size, easy to test
+const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
 #[program]
 pub mod counter_anchor {
@@ -14,17 +14,18 @@ pub mod counter_anchor {
 
     use super::*;
 
-    pub fn initialize_counter(ctx: Context<Initialize>) -> Result<()> {
-        let summary = &mut ctx.accounts.summary;
-        summary.leaf_chunk_count = 0u64;
-        summary.leaf_count = 0u64;
+    pub fn initialize_counter(_ctx: Context<Initialize>) -> Result<()> {
+        // let summary = &mut ctx.accounts.summary;
+        // summary.leaf_chunk_count = 0u64;
+        // summary.leaf_count = 0u64;
         Ok(())
     }
 
     pub fn increase_summary_account_space(
         _ctx: Context<IncreaseSummaryAccount>,
-        _len: u32
+        len: u32
     ) -> Result<()> {
+        msg!("increase_summary_account_space:{}", len);
         Ok(())
     }
 
@@ -37,46 +38,33 @@ pub mod counter_anchor {
 
     pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64, addr: Pubkey) -> Result<()> {
         let summary = &mut ctx.accounts.summary;
-        let chunk_count = summary.leaf_chunk_count;
-        let leaf_account = &mut ctx.accounts.leaf;
+        summary.load_mut()?.leaf_chunk_accounts[amount as usize] = 3u8;
+        msg!("value:{}", summary.load_mut()?.leaf_chunk_accounts[amount as usize]);
         
-        if leaf_account.leaf_hashes.len() >= CHUNK_SIZE {
-            return Err(ErrorCode::ChunkFull.into());
-        }
-
-        let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash_array();
-        leaf_account.leaf_hashes.push(leaf_hash);
-        if leaf_account.leaf_hashes.len() == CHUNK_SIZE {
-            summary.leaf_chunk_count += 1;
-        }
-
-        let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        // load pre pda leaf_hashes
-        if chunk_count  > 0 {
-            let leaf_pda_accounts: Vec<Account<LeafChunkAccount>> = ctx
-            .remaining_accounts
-            .iter()
-            .take(chunk_count as usize)
-            .map(|acc| Account::try_from(acc).unwrap())
-            .collect();
-
-            for (_i, leaf_chunk_account_item) in leaf_pda_accounts.iter().enumerate() {
-                // msg!("index: {}, leaf_hashes: {:?}", i, leaf_chunk_account_item.leaf_hashes.clone());
-                tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_chunk_account_item.leaf_hashes).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
-            }
-        }
-        // load current pda leaf_hashes
-        let leaf_count: u64 = chunk_count * CHUNK_SIZE as u64 + leaf_account.leaf_hashes.len() as u64 - 1 ;
-
+        // let summary = &mut ctx.accounts.summary;
+        // let leaf_chunk_account = &mut ctx.accounts.leaf_chunk;
         
-        tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_account.leaf_hashes).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        // if leaf_chunk_account.leaf_hashes.len() >= CHUNK_SIZE {
+        //     return Err(ErrorCode::ChunkFull.into());
+        // }
 
-        tree.merklize().unwrap();
-        let root = tree.get_merkle_root().unwrap();
-        //summary.merkle_root = root.try_into().map_err(|_| "Conversion failed").unwrap();
-        summary.leaf_count = leaf_count;
-       
-        emit!(DepositEvent{amount, addr, leaf_count});
+        // let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash_array();
+        // leaf_chunk_account.leaf_hashes.push(leaf_hash);
+
+        // let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
+        // tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_chunk_account.leaf_hashes).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        // tree.merklize().unwrap();
+        // let root = tree.get_merkle_root().unwrap();
+        // leaf_chunk_account.root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+
+        // let leaf_count: u64 = summary.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leaf_hashes.len() as u64 - 1 ;
+        // summary.leaf_count = leaf_count;
+        // emit!(DepositEvent{amount, addr, leaf_count});
+
+        // if leaf_chunk_account.leaf_hashes.len() == CHUNK_SIZE {
+        //     summary.leaf_chunk_count += 1;
+        //     leaf_chunk_account.is_fulled = true;
+        // }
 
         Ok(())
     }
@@ -119,10 +107,10 @@ pub struct Initialize<'info> {
 
     #[account(
         init,
-        space = 8 + SummaryAccount::INIT_SPACE,
-        payer = payer
+        payer = payer,
+        space = 10 * (1024 as usize),
     )]
-    pub summary: Account<'info, SummaryAccount>,
+    pub summary: AccountLoader<'info, SummaryAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -136,20 +124,20 @@ pub struct Deposit<'info> {
         init_if_needed, 
         payer = user, 
         space = 8 + LeafChunkAccount::INIT_SPACE, 
-        seeds = [b"leaf", summary.key().as_ref(), &summary.leaf_chunk_count.to_le_bytes()],
+        seeds = [b"leaf", summary.key().as_ref(), &summary.load_mut()?.leaf_chunk_count.to_le_bytes()],
         bump)
     ]
-    pub leaf: Account<'info, LeafChunkAccount>,
+    pub leaf_chunk: Account<'info, LeafChunkAccount>,
     #[account(mut)]
-    pub summary: Account<'info, SummaryAccount>,
+    pub summary: AccountLoader<'info, SummaryAccount>,
 }
 
-#[account]
-#[derive(InitSpace)]
+#[account(zero_copy(unsafe))]
+#[repr(C)]
 pub struct SummaryAccount {
-    pub leaf_chunk_accounts: [u8; 10232], //1024 * 10 -8, init space , will realloc later
     pub leaf_chunk_count: u64,
     pub leaf_count: u64,
+    pub leaf_chunk_accounts: [u8; 10240 * 1000 - 8 - 8 - 8],
 }
 
 #[derive(Accounts)]
@@ -159,7 +147,7 @@ pub struct IncreaseSummaryAccount<'info> {
         realloc = len as usize, 
         realloc::zero = true, 
         realloc::payer=signer)]
-    pub summary: Account<'info, SummaryAccount>,
+    pub summary: AccountLoader<'info, SummaryAccount>,
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(address = system_program::ID)]

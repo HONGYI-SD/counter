@@ -19,41 +19,50 @@ describe('counter_anchor', () => {
   const program = anchor.workspace.CounterAnchor as Program<CounterAnchor>;
   console.log("program id:", program.programId.toString())
 
+  //const signer = anchor.web3.Keypair.generate();
+  const connection = anchor.getProvider().connection;
+ 
   // const treeKeypair = new Keypair();
   // console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
   // const secretKeyString = JSON.stringify(Array.from(treeKeypair.secretKey));
   // console.log("merkle tree account secretKeyString:", secretKeyString)
 
   const secretKeyString = 
-  "[204,58,53,180,14,6,88,85,223,73,128,59,199,118,4,206,100,74,156,183,157,171,99,24,132,119,139,17,234,48,42,70,203,97,170,223,243,228,127,199,152,93,104,26,62,227,95,231,49,78,151,236,253,202,129,146,97,233,17,238,219,167,224,205]"
+  "[4,146,48,111,196,98,192,114,28,28,17,241,122,234,49,12,36,150,122,107,101,183,48,87,15,107,236,77,241,56,250,126,97,164,80,88,57,127,70,240,223,141,197,165,59,61,212,141,203,229,239,124,37,192,110,90,207,180,87,159,22,36,202,91]"
   const treeKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
 
-  // const [merkleTreePda, _] = anchor.web3.PublicKey.findProgramAddressSync(
-  //   [Buffer.from("merkle_tree")],
-  //   program.programId
-  // );
+  // before(async () => {
+  //   console.log(new Date(), "requesting airdrop");
+  //   const airdropTx = await connection.requestAirdrop(
+  //     treeKeypair.publicKey,
+  //     5 * anchor.web3.LAMPORTS_PER_SOL
+  //   );
+  //   await connection.confirmTransaction(airdropTx);
+  // });
 
   const localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
 
   it('Increment Counter', async () => {
     try {
-      const listenerEvent2 = program.addEventListener("depositEvent", async (event, _slot, _sig) => {
-        const eventIdx = event.leafCount.toNumber() - 1;
-        console.log("event index: ", eventIdx);
-        console.log('event amount:', event.amount.toNumber());
-        console.log("event addr", event.addr.toString());
+      const listenerEvent2 = program.addEventListener("depositEvent", async (_event, _slot, _sig) => {
+        // const eventIdx = event.leafCount.toNumber() - 1;
+        // console.log("event index: ", eventIdx);
+        // console.log('event amount:', event.amount.toNumber());
+        // console.log("event addr", event.addr.toString());
         
-        const addrU8Arr = bs58.decode(event.addr.toString());
-        console.log("addrU8Arr: ", addrU8Arr.toString());
-        const amountByteArr = event.amount.toArray('le', 8);
-        const amountUint8Array = new Uint8Array(amountByteArr);
-        const totalU8Arr = new Uint8Array(amountUint8Array.length + addrU8Arr.length);
-        totalU8Arr.set(amountUint8Array);
-        totalU8Arr.set(addrU8Arr, amountUint8Array.length);
-        localTree.add_leaf(totalU8Arr);
-        localTree.merklize();
-        console.log("new root:", localTree.get_merkle_root().toString());
+        // const addrU8Arr = bs58.decode(event.addr.toString());
+        // console.log("addrU8Arr: ", addrU8Arr.toString());
+        // const amountByteArr = event.amount.toArray('le', 8);
+        // const amountUint8Array = new Uint8Array(amountByteArr);
+        // const totalU8Arr = new Uint8Array(amountUint8Array.length + addrU8Arr.length);
+        // totalU8Arr.set(amountUint8Array);
+        // totalU8Arr.set(addrU8Arr, amountUint8Array.length);
+        // localTree.add_leaf(totalU8Arr);
+        // localTree.merklize();
+        // console.log("new root:", localTree.get_merkle_root().toString());
+
+
         // if (eventIdx > 0) {
         //   const proof: MerkleProof = localTree.merkle_proof_index(eventIdx);
         //   console.log("pairing hashes: ", proof.get_pairing_hashes());
@@ -66,12 +75,21 @@ describe('counter_anchor', () => {
 
         // }
       });
+      // for (let i = 2; i < 101; i++) {
+      //   const r = await program.methods.increaseSummaryAccountSpace(10240 * i)
+      //   .accounts({summary: treeKeypair.publicKey, signer: payer.publicKey})
+      //   //.signers([treeKeypair])
+      //   .rpc();
+      // }
+      
+      //console.log("increaseSummaryAccountSpace: ", r);
 
-      for (let i = 0; i < 1000; i++) {
-        const ret = await sendDeposit(program, treeKeypair, payer, i);
+      for (let i = 0; i < 1; i++) {
+        const ret = await sendDeposit(program, treeKeypair, payer, 1024 * 900);
+        console.log("xxxxxxxx: ", ret);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000*60*30));
+      await new Promise((resolve) => setTimeout(resolve, 1000*1));
       program.removeEventListener(listenerEvent2);
     } catch (error) {
       console.log('error:', error.toString())
@@ -82,8 +100,8 @@ describe('counter_anchor', () => {
 });
 
 async function sendDeposit(program: Program<CounterAnchor>, treeKeypair: Keypair, payer: anchor.Wallet, depositAmount: number) {
-  const merkleTree = await program.account.merkleTreeAccount.fetch(treeKeypair.publicKey);
-  const chunkCount = merkleTree.chunkCount;
+  const summary = await program.account.summaryAccount.fetch(treeKeypair.publicKey);
+  const chunkCount = summary.leafChunkCount;
   const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
     [
     Buffer.from("leaf"),
@@ -94,8 +112,8 @@ async function sendDeposit(program: Program<CounterAnchor>, treeKeypair: Keypair
   );
   console.log("chunk count : ",chunkCount,  "leaf pda : ", leafPda[0].toString());
   const ret = await program.methods.deposit(new BN(depositAmount), payer.publicKey)
-  .accounts({ user: payer.publicKey, merkleTree: treeKeypair.publicKey, leaf: leafPda[0] })
-  .remainingAccounts(await getRemainingLeafAccounts(program, treeKeypair.publicKey, chunkCount))
+  .accounts({ user: payer.publicKey, summary: treeKeypair.publicKey, leafChunk: leafPda[0] })
+  //.remainingAccounts(await getRemainingLeafAccounts(program, treeKeypair.publicKey, chunkCount))
   .rpc();
   console.log("deposit ret: ", ret.toString())
 }
