@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("5niitNYYWZaoP6uTwMQvwsKPhHGgb6MKw6EBMJtnY8Jf");
+declare_id!("Bf6fVifiXeajn3ha3wioRqKj3XoqitcTxefZijZFs4Xz");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
@@ -29,42 +29,62 @@ pub mod counter_anchor {
         Ok(())
     }
 
-    pub fn view<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, _amount: u64, _addr: Pubkey) -> Result<()> {
+    pub fn view<'info>(
+        ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
+        _amount: u64, 
+        _addr: Pubkey
+    ) -> Result<()> {
         let leaf_account_info = ctx.remaining_accounts.get(0).unwrap();
         let leaf_account_data: Account<LeafChunkAccount> = Account::try_from(leaf_account_info)?;
         msg!("leaf hashes: {:?}", leaf_account_data.leaf_hashes);
         Ok(())
     }
 
-    pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64, addr: Pubkey) -> Result<()> {
-        let summary = &mut ctx.accounts.summary;
-        summary.load_mut()?.leaf_chunk_accounts[amount as usize] = 3u8;
-        msg!("value:{}", summary.load_mut()?.leaf_chunk_accounts[amount as usize]);
-        
+    // pub fn update_leaf_pda() -> Result<()> {
+
+    // }
+
+    pub fn deposit<'info>(
+        ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
+        amount: u64, 
+        addr: Pubkey
+    ) -> Result<()> {
         // let summary = &mut ctx.accounts.summary;
-        // let leaf_chunk_account = &mut ctx.accounts.leaf_chunk;
+        // summary.load_mut()?.leaf_chunk_accounts[amount as usize] = 3u8;
+        // msg!("value:{}", summary.load_mut()?.leaf_chunk_accounts[amount as usize]);
         
-        // if leaf_chunk_account.leaf_hashes.len() >= CHUNK_SIZE {
-        //     return Err(ErrorCode::ChunkFull.into());
-        // }
+        let summary = &mut ctx.accounts.summary;
+        let leaf_chunk_account = &mut ctx.accounts.leaf_chunk;
+        
+        if leaf_chunk_account.leaf_hashes.len() >= CHUNK_SIZE {
+            return Err(ErrorCode::ChunkFull.into());
+        }
 
-        // let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash_array();
-        // leaf_chunk_account.leaf_hashes.push(leaf_hash);
+        let leaf_pda_addr = leaf_chunk_account.key().to_bytes();
+        let leaf_chunk_count = summary.load_mut()?.leaf_chunk_count;
+        //if summary.load_mut()?.leaf_chunk_accounts[leaf_chunk_count as usize * 32] == 0u8 {
+        //    summary.load_mut()?.leaf_chunk_accounts[(leaf_chunk_count as usize * 32)..((leaf_chunk_count + 1) as usize * 32)].copy_from_slice(&leaf_pda_addr);
+        //}
+        // update pda account
+        summary.load_mut()?.leaf_chunk_accounts[(leaf_chunk_count as usize * 32)..((leaf_chunk_count + 1) as usize * 32)].copy_from_slice(&leaf_pda_addr);
 
-        // let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        // tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_chunk_account.leaf_hashes).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
-        // tree.merklize().unwrap();
-        // let root = tree.get_merkle_root().unwrap();
-        // leaf_chunk_account.root = root.try_into().map_err(|_| "Conversion failed").unwrap();
+        let leaf_hash = DepositInfo{addr: addr.clone(), amount}.double_hash_array();
+        leaf_chunk_account.leaf_hashes.push(leaf_hash);
 
-        // let leaf_count: u64 = summary.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leaf_hashes.len() as u64 - 1 ;
-        // summary.leaf_count = leaf_count;
-        // emit!(DepositEvent{amount, addr, leaf_count});
+        let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
+        tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_chunk_account.leaf_hashes).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        tree.merklize().unwrap();
+        let root = tree.get_merkle_root().unwrap();
+        leaf_chunk_account.root = root.try_into().map_err(|_| "Conversion failed").unwrap();
 
-        // if leaf_chunk_account.leaf_hashes.len() == CHUNK_SIZE {
-        //     summary.leaf_chunk_count += 1;
-        //     leaf_chunk_account.is_fulled = true;
-        // }
+        let leaf_count: u64 = summary.load_mut()?.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leaf_hashes.len() as u64 - 1 ;
+        summary.load_mut()?.leaf_count = leaf_count;
+        emit!(DepositEvent{amount, addr, leaf_count});
+
+        if leaf_chunk_account.leaf_hashes.len() == CHUNK_SIZE {
+            summary.load_mut()?.leaf_chunk_count += 1;
+            leaf_chunk_account.is_fulled = true;
+        }
 
         Ok(())
     }
@@ -137,7 +157,7 @@ pub struct Deposit<'info> {
 pub struct SummaryAccount {
     pub leaf_chunk_count: u64,
     pub leaf_count: u64,
-    pub leaf_chunk_accounts: [u8; 10240 * 1000 - 8 - 8 - 8],
+    pub leaf_chunk_accounts: [u8; 10240 * 1000 - 8 - 8 - 8], // about 10MB
 }
 
 #[derive(Accounts)]
