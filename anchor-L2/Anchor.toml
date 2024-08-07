@@ -1,0 +1,21 @@
+[features]
+skip-lint = false
+
+# [programs.Localnet]
+# my_program = "target/deploy/counter_anchor.so"
+# counter_anchor = "DzJQf39X1SF13WYX8LX34ZRA2Pfm55MXKsPByz8hWxvz"
+
+[registry]
+#url = "https://api.apr.dev"
+url = "https://solana-devnet.g.alchemy.com/v2/ef2e69V9ffwrYg5htlDu9YbOLu2FrJON"
+
+[provider]
+cluster = "Localnet"
+#cluster = "https://solana-devnet.g.alchemy.com/v2/ef2e69V9ffwrYg5htlDu9YbOLu2FrJON"
+wallet = "~/.config/solana/id.json"
+#skippreflight = true
+
+[scripts]
+init = "pnpm ts-mocha -p ./tsconfig.json -t 1000000 tests/init.ts"
+test = "pnpm ts-mocha -p ./tsconfig.json -t 1000000 tests/**/counter_anchor.ts"
+hdd_test = "pnpm ts-mocha -p ./tsconfig.json -t 1000000 tests/**/hdd_test.ts"
