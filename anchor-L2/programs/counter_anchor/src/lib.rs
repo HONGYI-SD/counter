@@ -6,7 +6,7 @@ use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
 declare_id!("8VpeCPVs6mjDTgrvXgyhhwqoju86kg7STToPbToJ7u4g");
 
-const CHUNK_SIZE: usize = 10; // temp size, easy to test
+const CHUNK_SIZE: usize = 10; // temp size, easy for test
 
 #[program]
 pub mod counter_anchor {
@@ -22,7 +22,7 @@ pub mod counter_anchor {
     }
 
     pub fn increase_summary_account_space(
-        _ctx: Context<IncreaseSummaryAccount>,
+        _ctx: Context<IncreaseL2SummaryAccount>,
         len: u32
     ) -> Result<()> {
         msg!("increase_summary_account_space:{}", len);
@@ -40,9 +40,15 @@ pub mod counter_anchor {
         Ok(())
     }
 
-    // pub fn update_leaf_pda() -> Result<()> {
-
-    // }
+    pub fn update_leafpda_merkle_root<'info>(
+        ctx: Context<'_, '_, 'info, 'info, UpdataRoot<'info>>, 
+        root: Vec<u8>,
+    ) -> Result<()> {
+        let _l2summary = &mut ctx.accounts.l2summary;
+        let leaf_chunk_pda = &mut ctx.accounts.leaf_chunk_pda;
+        leaf_chunk_pda.root.copy_from_slice(&root);
+        Ok(())
+    }
 
     pub fn deposit<'info>(
         ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
@@ -95,7 +101,7 @@ pub mod counter_anchor {
     }
 
     pub fn verify_merkle_proof(
-        ctx: Context<Deposit>, 
+        ctx: Context<UpdataRoot>, 
         deposit_amount: u64,
         user_addr: Pubkey,
         proof_index: u32,
@@ -106,7 +112,8 @@ pub mod counter_anchor {
         msg!("proof_index: {}", proof_index);
         msg!("proof_hashes: {:?}", proof_hashes);
         
-        let accs_deposit = &mut ctx.accounts.summary;
+        let _l2summary = &mut ctx.accounts.l2summary;
+        let leaf_chunk_pda = &mut ctx.accounts.leaf_chunk_pda;
 
         // recover the proof
         let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, proof_index, proof_hashes);
@@ -117,7 +124,10 @@ pub mod counter_anchor {
         assert_eq!(32, tmp_root.len());
         let mut proof_root = [0u8; 32];
         proof_root.copy_from_slice(&tmp_root);
-        //assert_eq!(accs_deposit.merkle_root, proof_root);
+        msg!("leaf_chunk_pda addr: {:?}", leaf_chunk_pda.key().to_string());
+        msg!("leaf_chunk_pda root: {:?}", leaf_chunk_pda.root);
+        msg!("proof root: {:?}", proof_root);
+        //assert_eq!(leaf_chunk_pda.root, proof_root);
 
         // todo mint spl token
         Ok(())
@@ -135,7 +145,7 @@ pub struct Initialize<'info> {
         payer = payer,
         space = 10 * (1024 as usize),
     )]
-    pub summary: AccountLoader<'info, SummaryAccount>,
+    pub summary: AccountLoader<'info, L2SummaryAccount>,
     pub system_program: Program<'info, System>,
 }
 
@@ -154,12 +164,29 @@ pub struct Deposit<'info> {
     ]
     pub leaf_chunk: Account<'info, LeafChunkAccount>,
     #[account(mut)]
-    pub summary: AccountLoader<'info, SummaryAccount>,
+    pub summary: AccountLoader<'info, L2SummaryAccount>,
+}
+
+#[derive(Accounts)]
+pub struct UpdataRoot<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    #[account(
+        init_if_needed, 
+        payer = user, 
+        space = 8 + LeafChunkAccount::INIT_SPACE, 
+        seeds = [b"leaf", l2summary.key().as_ref(), &l2summary.load_mut()?.leaf_chunk_count.to_le_bytes()],
+        bump)
+    ]
+    pub leaf_chunk_pda: Account<'info, LeafChunkAccount>,
+    #[account(mut)]
+    pub l2summary: AccountLoader<'info, L2SummaryAccount>,
 }
 
 #[account(zero_copy(unsafe))]
 #[repr(C)]
-pub struct SummaryAccount {
+pub struct L2SummaryAccount {
     pub leaf_chunk_count: u64,
     pub leaf_count: u64,
     pub leaf_chunk_accounts: [u8; 10240 * 10 - 8 - 8 - 8], // about 10KB
@@ -167,12 +194,12 @@ pub struct SummaryAccount {
 
 #[derive(Accounts)]
 #[instruction(len: u32)]
-pub struct IncreaseSummaryAccount<'info> {
+pub struct IncreaseL2SummaryAccount<'info> {
     #[account(mut, 
         realloc = len as usize, 
         realloc::zero = true, 
         realloc::payer=signer)]
-    pub summary: AccountLoader<'info, SummaryAccount>,
+    pub summary: AccountLoader<'info, L2SummaryAccount>,
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(address = system_program::ID)]
