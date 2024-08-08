@@ -67,6 +67,9 @@ pub mod counter_anchor {
         //}
         // update pda account
         summary.load_mut()?.leaf_chunk_accounts[(leaf_chunk_count as usize * 32)..((leaf_chunk_count + 1) as usize * 32)].copy_from_slice(&leaf_pda_addr);
+        msg!("leaf pda: {:?}", 
+        &summary.load_mut()?.leaf_chunk_accounts[(leaf_chunk_count as usize * 32)..((leaf_chunk_count + 1) as usize * 32)]
+        );
 
         let leaf_hash = DepositInfo{user: user.clone(), amount}.double_hash_array();
         leaf_chunk_account.leaf_hashes.push(leaf_hash);
@@ -80,7 +83,8 @@ pub mod counter_anchor {
         let leaf_count: u64 = summary.load_mut()?.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leaf_hashes.len() as u64 - 1 ;
         summary.load_mut()?.leaf_count = leaf_count;
         emit!(DepositEvent{
-            amount, user, 
+            amount, 
+            user, 
             deposit_index: leaf_count, 
             merkle_root: leaf_chunk_account.root, 
             leaf_account_pubkey: leaf_chunk_account.key(),

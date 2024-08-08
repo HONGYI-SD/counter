@@ -21,7 +21,7 @@ pub mod counter_anchor {
         Ok(())
     }
 
-    pub fn increase_summary_account_space(
+    pub fn increase_l2summary_account_space(
         _ctx: Context<IncreaseL2SummaryAccount>,
         len: u32
     ) -> Result<()> {
@@ -43,6 +43,7 @@ pub mod counter_anchor {
     pub fn update_leafpda_merkle_root<'info>(
         ctx: Context<'_, '_, 'info, 'info, UpdataRoot<'info>>, 
         root: Vec<u8>,
+        updata_index: u64,
     ) -> Result<()> {
         let _l2summary = &mut ctx.accounts.l2summary;
         let leaf_chunk_pda = &mut ctx.accounts.leaf_chunk_pda;
@@ -145,7 +146,7 @@ pub struct Initialize<'info> {
         payer = payer,
         space = 10 * (1024 as usize),
     )]
-    pub summary: AccountLoader<'info, L2SummaryAccount>,
+    pub l2summary: AccountLoader<'info, L2SummaryAccount>,
     pub system_program: Program<'info, System>,
 }
 

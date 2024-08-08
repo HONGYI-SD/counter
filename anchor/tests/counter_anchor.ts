@@ -28,7 +28,7 @@ describe('counter_anchor', () => {
   // console.log("merkle tree account secretKeyString:", secretKeyString)
 
   const secretKeyString = 
-  "[83,89,236,225,191,226,199,24,157,130,92,49,123,202,43,142,17,51,249,69,122,82,192,145,166,84,93,17,236,95,130,99,12,178,147,199,95,134,181,186,132,145,103,188,4,182,217,174,54,102,43,242,199,235,82,152,27,177,109,113,152,76,252,248]"
+  "[193,232,136,199,108,224,255,159,181,116,237,85,85,30,135,190,125,66,27,105,233,22,78,201,113,28,48,7,87,51,208,188,205,175,107,136,200,184,244,123,17,244,111,212,88,17,11,28,86,57,66,255,128,156,177,100,174,120,179,102,230,4,55,89]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
@@ -46,7 +46,7 @@ describe('counter_anchor', () => {
   it('Increment Counter', async () => {
     try {
       const listenerEvent2 = program.addEventListener("depositEvent", async (event, _slot, _sig) => {
-        const depositIndex = event.depositIndex.toNumber() - 1;
+        const depositIndex = event.depositIndex.toNumber();
         console.log("event depositIndex: ", depositIndex);
         console.log("event leafAccountPubkey: ", event.leafAccountPubkey.toString());
         console.log("event merkle root: ", event.merkleRoot.toString());
@@ -80,12 +80,13 @@ describe('counter_anchor', () => {
       
       //console.log("increaseSummaryAccountSpace: ");
 
-      const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
       
-      for (let i = 0; i < 12; i++) {
+      
+      for (let i = 0; i < 1; i++) {
         await sendDeposit(program, summaryKeypair, payer, i);
       }
 
+      const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
       const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
         [
         Buffer.from("leaf"),
@@ -94,11 +95,12 @@ describe('counter_anchor', () => {
       ],
         program.programId
       );
-      console.log("comput pda1: ", leafPda[0].toBytes())
+      console.log("comput pda1 str: ", leafPda[0].toString());
+      console.log("comput pda1: ", leafPda[0].toBytes());
       let pda1 = summary.leafChunkAccounts.slice(0, 32);
       console.log("pda1: ", pda1.toString());
-      let pda2 = summary.leafChunkAccounts.slice(32, 64);
-      console.log("pda2: ", pda2.toLocaleString());
+      // let pda2 = summary.leafChunkAccounts.slice(32, 64);
+      // console.log("pda2: ", pda2.toLocaleString());
 
       await new Promise((resolve) => setTimeout(resolve, 1000*1));
       program.removeEventListener(listenerEvent2);
