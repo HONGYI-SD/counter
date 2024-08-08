@@ -1,13 +1,10 @@
 import * as anchor from '@coral-xyz/anchor';
 import type { Program } from '@coral-xyz/anchor';
 import { Keypair } from '@solana/web3.js';
-import { assert } from 'chai';
 import type { CounterAnchor } from '../target/types/counter_anchor';
 import BN from 'bn.js';
-import { publicKey } from '@coral-xyz/anchor/dist/cjs/utils';
 import bs58 from 'bs58';
 import { HashingAlgorithm, MerkleTree, MerkleProof } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
-import { SYSTEM_PROGRAM_ID } from '@coral-xyz/anchor/dist/cjs/native/system';
 
 const CHUNK_SIZE = 100;
 describe('counter_anchor', () => {
@@ -28,7 +25,7 @@ describe('counter_anchor', () => {
   // console.log("merkle tree account secretKeyString:", secretKeyString)
 
   const secretKeyString = 
-  "[83,89,236,225,191,226,199,24,157,130,92,49,123,202,43,142,17,51,249,69,122,82,192,145,166,84,93,17,236,95,130,99,12,178,147,199,95,134,181,186,132,145,103,188,4,182,217,174,54,102,43,242,199,235,82,152,27,177,109,113,152,76,252,248]"
+  "[248,206,172,123,40,211,229,101,31,246,109,160,157,29,195,83,230,153,120,114,69,20,8,39,19,163,188,148,121,93,170,64,190,32,135,116,84,18,23,80,146,53,106,65,97,205,216,6,37,183,146,236,100,77,180,35,249,45,211,249,218,53,33,139]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
@@ -71,7 +68,8 @@ describe('counter_anchor', () => {
       
       const addrU8Arr = bs58.decode(payer.publicKey.toString());
       console.log("addrU8Arr: ", addrU8Arr.toString());
-      const amountByteArr = new BN(1).toArray('le', 8);
+      const depositAmount = new BN(1);
+      const amountByteArr = depositAmount.toArray('le', 8);
       const amountUint8Array = new Uint8Array(amountByteArr);
       const totalU8Arr = new Uint8Array(amountUint8Array.length + addrU8Arr.length);
       totalU8Arr.set(amountUint8Array);
@@ -80,14 +78,16 @@ describe('counter_anchor', () => {
       localTree.merklize();
       let root = localTree.get_merkle_root();
 
-      program.methods.updateLeafpdaMerkleRoot(
-        depositAmount: new BN(1), 
-        depositIndex: new BN(1),
-        userAddr: payer.publicKey,
-        proofIndex: 1,
-        proofHashes: Buffer.from(root),
-        )
-      .accounts(l2summary: summaryKeypair.publicKey)
+      const depositIndex = new BN(1);
+      await program.methods.updateLeafpdaMerkleRoot(Buffer.from(root), depositIndex)
+      .accounts({l2Summary: summaryKeypair.publicKey})
+      .rpc();
+
+      const proof: MerkleProof = localTree.merkle_proof_index(0);
+      let proof_hashes = proof.get_pairing_hashes();
+
+      await program.methods.verifyMerkleProof(depositAmount, depositIndex.toNumber(), payer.publicKey, Buffer.from(proof_hashes))
+      .accounts({l2Summary: summaryKeypair.publicKey})
       .rpc();
 
       await new Promise((resolve) => setTimeout(resolve, 1000*1));
