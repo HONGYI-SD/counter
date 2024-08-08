@@ -32,15 +32,6 @@ describe('counter_anchor', () => {
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
-  // before(async () => {
-  //   console.log(new Date(), "requesting airdrop");
-  //   const airdropTx = await connection.requestAirdrop(
-  //     treeKeypair.publicKey,
-  //     5 * anchor.web3.LAMPORTS_PER_SOL
-  //   );
-  //   await connection.confirmTransaction(airdropTx);
-  // });
-
   const localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
 
   it('Increment Counter', async () => {
@@ -78,27 +69,26 @@ describe('counter_anchor', () => {
         // }
       });
       
-      //console.log("increaseSummaryAccountSpace: ");
+      const addrU8Arr = bs58.decode(payer.publicKey.toString());
+      console.log("addrU8Arr: ", addrU8Arr.toString());
+      const amountByteArr = new BN(1).toArray('le', 8);
+      const amountUint8Array = new Uint8Array(amountByteArr);
+      const totalU8Arr = new Uint8Array(amountUint8Array.length + addrU8Arr.length);
+      totalU8Arr.set(amountUint8Array);
+      totalU8Arr.set(addrU8Arr, amountUint8Array.length);
+      localTree.add_leaf(totalU8Arr);
+      localTree.merklize();
+      let root = localTree.get_merkle_root();
 
-      const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
-      
-      for (let i = 0; i < 12; i++) {
-        await sendDeposit(program, summaryKeypair, payer, i);
-      }
-
-      const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-        Buffer.from("leaf"),
-        summaryKeypair.publicKey.toBuffer(),
-        new BN(0).toArrayLike(Buffer, 'le', 8)
-      ],
-        program.programId
-      );
-      console.log("comput pda1: ", leafPda[0].toBytes())
-      let pda1 = summary.leafChunkAccounts.slice(0, 32);
-      console.log("pda1: ", pda1.toString());
-      let pda2 = summary.leafChunkAccounts.slice(32, 64);
-      console.log("pda2: ", pda2.toLocaleString());
+      program.methods.updateLeafpdaMerkleRoot(
+        depositAmount: new BN(1), 
+        depositIndex: new BN(1),
+        userAddr: payer.publicKey,
+        proofIndex: 1,
+        proofHashes: Buffer.from(root),
+        )
+      .accounts(l2summary: summaryKeypair.publicKey)
+      .rpc();
 
       await new Promise((resolve) => setTimeout(resolve, 1000*1));
       program.removeEventListener(listenerEvent2);
@@ -109,40 +99,3 @@ describe('counter_anchor', () => {
   });
 
 });
-
-async function sendDeposit(program: Program<CounterAnchor>, summaryKeypair: Keypair, payer: anchor.Wallet, depositAmount: number) {
-  const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
-  const chunkCount = summary.leafChunkCount;
-  const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
-    [
-    Buffer.from("leaf"),
-    summaryKeypair.publicKey.toBuffer(),
-    chunkCount.toArrayLike(Buffer, 'le', 8)
-  ],
-    program.programId
-  );
-  const ret = await program.methods.deposit(new BN(depositAmount), payer.publicKey)
-  .accounts({ user: payer.publicKey, summary: summaryKeypair.publicKey, leafChunk: leafPda[0] })
-  //.remainingAccounts(await getRemainingLeafAccounts(program, treeKeypair.publicKey, chunkCount))
-  .rpc();
-}
-
-async function getRemainingLeafAccounts(program: Program<CounterAnchor>, merkleTreePda: anchor.web3.PublicKey, chunkCount: anchor.BN) {
-  const remainingAccounts = [];
-  if (chunkCount.toNumber() === 0) {
-    return remainingAccounts;
-  }
-  for (let i = 0; i <= (chunkCount.toNumber()-1); i++) {
-      const [leafPda, _] =  anchor.web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("leaf"), merkleTreePda.toBuffer(), new BN(i).toArrayLike(Buffer, 'le', 8)],
-          program.programId
-      );
-      //console.log("hdd leafPda:", leafPda);
-      remainingAccounts.push({
-          pubkey: leafPda,
-          isSigner: false,
-          isWritable: false,
-      });
-  }
-  return remainingAccounts;
-}

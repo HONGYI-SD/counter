@@ -37,19 +37,19 @@ describe('counter_anchor', () => {
     await program.methods
       .initializeCounter()
       .accounts({
-        summary: summaryKeypair.publicKey,
+        l2summary: summaryKeypair.publicKey,
         payer: payer.publicKey,
       })
       .signers([summaryKeypair])
       .rpc();
   });
 
-  it('realloc memory', async () => {
-      for (let i = 2; i < 11; i++) {
-        const r = await program.methods.increaseSummaryAccountSpace(10240 * i)
-        .accounts({summary: summaryKeypair.publicKey, signer: payer.publicKey})
-        .rpc();
-      }
-  });
+  // it('realloc memory', async () => {
+  //     for (let i = 2; i < 11; i++) {
+  //       const r = await program.methods.increaseL2summaryAccountSpace(10240 * i)
+  //       .accounts({l2summary: summaryKeypair.publicKey, signer: payer.publicKey})
+  //       .rpc();
+  //     }
+  // });
   
 });
