@@ -1,12 +1,7 @@
 import * as anchor from '@coral-xyz/anchor';
 import type { Program } from '@coral-xyz/anchor';
 import { Keypair } from '@solana/web3.js';
-import { assert } from 'chai';
 import type { CounterAnchor } from '../target/types/counter_anchor';
-import BN from 'bn.js';
-import { publicKey } from '@coral-xyz/anchor/dist/cjs/utils';
-import bs58 from 'bs58';
-import {HashingAlgorithm, MerkleTree} from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 
 describe('counter_anchor', () => {
   // Configure the client to use the local cluster.

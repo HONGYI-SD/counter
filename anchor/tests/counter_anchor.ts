@@ -1,13 +1,9 @@
 import * as anchor from '@coral-xyz/anchor';
 import type { Program } from '@coral-xyz/anchor';
 import { Keypair } from '@solana/web3.js';
-import { assert } from 'chai';
 import type { CounterAnchor } from '../target/types/counter_anchor';
 import BN from 'bn.js';
-import { publicKey } from '@coral-xyz/anchor/dist/cjs/utils';
-import bs58 from 'bs58';
-import { HashingAlgorithm, MerkleTree, MerkleProof } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
-import { SYSTEM_PROGRAM_ID } from '@coral-xyz/anchor/dist/cjs/native/system';
+import { HashingAlgorithm, MerkleTree } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 
 const CHUNK_SIZE = 100;
 describe('counter_anchor', () => {
@@ -19,27 +15,10 @@ describe('counter_anchor', () => {
   const program = anchor.workspace.CounterAnchor as Program<CounterAnchor>;
   console.log("program id:", program.programId.toString())
 
-  //const signer = anchor.web3.Keypair.generate();
-  const connection = anchor.getProvider().connection;
- 
-  // const treeKeypair = new Keypair();
-  // console.log("merkle tree account pubkey:", treeKeypair.publicKey.toString())
-  // const secretKeyString = JSON.stringify(Array.from(treeKeypair.secretKey));
-  // console.log("merkle tree account secretKeyString:", secretKeyString)
-
   const secretKeyString = 
   "[193,232,136,199,108,224,255,159,181,116,237,85,85,30,135,190,125,66,27,105,233,22,78,201,113,28,48,7,87,51,208,188,205,175,107,136,200,184,244,123,17,244,111,212,88,17,11,28,86,57,66,255,128,156,177,100,174,120,179,102,230,4,55,89]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
-
-  // before(async () => {
-  //   console.log(new Date(), "requesting airdrop");
-  //   const airdropTx = await connection.requestAirdrop(
-  //     treeKeypair.publicKey,
-  //     5 * anchor.web3.LAMPORTS_PER_SOL
-  //   );
-  //   await connection.confirmTransaction(airdropTx);
-  // });
 
   const localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
 
@@ -77,10 +56,6 @@ describe('counter_anchor', () => {
 
         // }
       });
-      
-      //console.log("increaseSummaryAccountSpace: ");
-
-      
       
       for (let i = 0; i < 1; i++) {
         await sendDeposit(program, summaryKeypair, payer, i);
@@ -127,24 +102,4 @@ async function sendDeposit(program: Program<CounterAnchor>, summaryKeypair: Keyp
   .accounts({ user: payer.publicKey, summary: summaryKeypair.publicKey, leafChunk: leafPda[0] })
   //.remainingAccounts(await getRemainingLeafAccounts(program, treeKeypair.publicKey, chunkCount))
   .rpc();
-}
-
-async function getRemainingLeafAccounts(program: Program<CounterAnchor>, merkleTreePda: anchor.web3.PublicKey, chunkCount: anchor.BN) {
-  const remainingAccounts = [];
-  if (chunkCount.toNumber() === 0) {
-    return remainingAccounts;
-  }
-  for (let i = 0; i <= (chunkCount.toNumber()-1); i++) {
-      const [leafPda, _] =  anchor.web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("leaf"), merkleTreePda.toBuffer(), new BN(i).toArrayLike(Buffer, 'le', 8)],
-          program.programId
-      );
-      //console.log("hdd leafPda:", leafPda);
-      remainingAccounts.push({
-          pubkey: leafPda,
-          isSigner: false,
-          isWritable: false,
-      });
-  }
-  return remainingAccounts;
 }
