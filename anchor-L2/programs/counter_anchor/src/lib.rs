@@ -3,6 +3,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
+use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 
 declare_id!("VphJHWrFwGrV1omKJV627yx1ywU68M4TUbe5wA8SNYD");
 
@@ -11,6 +12,7 @@ const HASH_SIZE: usize = 32;
 
 #[program]
 pub mod counter_anchor {
+    use anchor_spl::token;
     use dd_merkle_tree::MerkleProof;
 
     use super::*;
@@ -71,6 +73,15 @@ pub mod counter_anchor {
         assert_eq!(root_on_chain, proof_root);
 
         // todo mint spl token
+        let cpi_accounts = MintTo{
+            mint: ctx.accounts.mint.to_account_info(),
+            to: ctx.accounts.user_token_account.to_account_info(),
+            authority: ctx.accounts.admin.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::mint_to(cpi_ctx, deposit_amount)?;
+
         Ok(())
 
     }
@@ -79,11 +90,11 @@ pub mod counter_anchor {
 #[derive(Accounts)]
 pub struct L2Initialize<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub admin: Signer<'info>,
 
     #[account(
         init,
-        payer = payer,
+        payer = admin,
         space = 10 * (1024 as usize),
     )]
     pub l2_summary: AccountLoader<'info, L2SummaryAccount>,
@@ -95,10 +106,15 @@ pub struct L2Initialize<'info> {
 #[derive(Accounts)]
 pub struct UpdataRoot<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
     pub l2_summary: AccountLoader<'info, L2SummaryAccount>,
+    #[account(mut)]
+    pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[account(zero_copy(unsafe))]
@@ -115,10 +131,10 @@ pub struct IncreaseL2SummaryAccount<'info> {
     #[account(mut, 
         realloc = len as usize, 
         realloc::zero = true, 
-        realloc::payer=signer)]
+        realloc::payer=admin)]
     pub l2_summary: AccountLoader<'info, L2SummaryAccount>,
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub admin: Signer<'info>,
     #[account(address = system_program::ID)]
     pub system_program: Program<'info, System>,
 }
