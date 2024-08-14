@@ -1,7 +1,7 @@
 # solana L2 simple bridge
 ## L1
 - ~~记录 deposit 操作~~
-- 用户扣款 
+- ~~用户扣款 ~~
 - ~~更新 merkle root, leafs~~
 - ~~event msg~~
 - merkle tree 支持无限容量
@@ -14,4 +14,11 @@
 ## L2
 - 从 L1 同步 merkle root (这一步后面做……)
 - ~~验证 proof 正确性~~
-- 验证通过，mint SPL token
+- ~~验证通过，mint SPL token~~
+
+# offchain 改造
+编译&执行
+```sh
+npx tsc init.ts --resolveJsonModule --esModuleInterop
+node init.js
+```
