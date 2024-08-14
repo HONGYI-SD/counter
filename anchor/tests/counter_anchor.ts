@@ -1,6 +1,6 @@
 import * as anchor from '@coral-xyz/anchor';
 import type { Program } from '@coral-xyz/anchor';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import type { CounterAnchor } from '../target/types/counter_anchor';
 import BN from 'bn.js';
 import { HashingAlgorithm, MerkleTree } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
@@ -16,16 +16,27 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const secretKeyString = 
-  "[193,232,136,199,108,224,255,159,181,116,237,85,85,30,135,190,125,66,27,105,233,22,78,201,113,28,48,7,87,51,208,188,205,175,107,136,200,184,244,123,17,244,111,212,88,17,11,28,86,57,66,255,128,156,177,100,174,120,179,102,230,4,55,89]"
+  "[154,8,9,127,139,28,52,0,248,1,10,22,50,136,44,190,72,227,113,128,14,145,60,210,223,158,37,118,173,97,52,134,99,186,133,92,151,127,116,129,138,212,28,71,155,231,52,28,132,47,151,128,66,25,227,216,56,186,185,133,117,253,47,145]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
   const localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
 
+  enum EventEnum {
+    DEPOSITEVENT = 1,
+  }
+  const EventEnumReverseMapping = {
+    1: "DEPOSITEVENT",
+};
+
   it('Increment Counter', async () => {
     try {
-      const listenerEvent2 = program.addEventListener("depositEvent", async (event, _slot, _sig) => {
+      const listenerEvent2 = program.addEventListener("depositEvent", async (event, slot, _sig) => {
         const depositIndex = event.depositIndex.toNumber();
+        console.log("event slot: ", slot);
+        console.log("event eventslot: ", event.slot.toNumber());
+        console.log("event label: ", event.label);
+        console.log("event label: ", EventEnumReverseMapping[event.label]);
         console.log("event depositIndex: ", depositIndex);
         console.log("event leafAccountPubkey: ", event.leafAccountPubkey.toString());
         console.log("event merkle root: ", event.merkleRoot.toString());
@@ -57,9 +68,29 @@ describe('counter_anchor', () => {
         // }
       });
       
+      const programWallet = anchor.web3.Keypair.generate();
+      const prograWalletRent = await provider.connection.getMinimumBalanceForRentExemption(0);
+      const createWalletIx = SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: programWallet.publicKey,
+        space: 0,
+        lamports: prograWalletRent,
+        programId: program.programId,
+      });
+      const tx = new Transaction().add(createWalletIx);
+      await sendAndConfirmTransaction(provider.connection, tx, [payer.payer, programWallet]);
+
       for (let i = 0; i < 1; i++) {
-        await sendDeposit(program, summaryKeypair, payer, i);
+        await sendDeposit(program, summaryKeypair, programWallet, payer, 10);
       }
+
+      await program.methods.withdraw(new anchor.BN(2))
+      .accounts({
+        user: payer.publicKey,
+        walletAccount: programWallet.publicKey,
+      })
+      //.signers([programWallet])
+      .rpc();
 
       const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
       const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
@@ -87,7 +118,7 @@ describe('counter_anchor', () => {
 
 });
 
-async function sendDeposit(program: Program<CounterAnchor>, summaryKeypair: Keypair, payer: anchor.Wallet, depositAmount: number) {
+async function sendDeposit(program: Program<CounterAnchor>, summaryKeypair: Keypair, programWallet: Keypair, payer: anchor.Wallet, depositAmount: number) {
   const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
   const chunkCount = summary.leafChunkCount;
   const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
@@ -99,7 +130,12 @@ async function sendDeposit(program: Program<CounterAnchor>, summaryKeypair: Keyp
     program.programId
   );
   const ret = await program.methods.deposit(new BN(depositAmount), payer.publicKey)
-  .accounts({ user: payer.publicKey, summary: summaryKeypair.publicKey, leafChunk: leafPda[0] })
+  .accounts({ 
+    user: payer.publicKey, 
+    summary: summaryKeypair.publicKey, 
+    leafChunk: leafPda[0],
+    walletAccount: programWallet.publicKey,
+   })
   //.remainingAccounts(await getRemainingLeafAccounts(program, treeKeypair.publicKey, chunkCount))
   .rpc();
 }

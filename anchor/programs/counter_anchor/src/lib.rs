@@ -4,12 +4,13 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("8VpeCPVs6mjDTgrvXgyhhwqoju86kg7STToPbToJ7u4g");
+declare_id!("33bwyrafRxtDkwwpqcBnwhwpemna4vN2RhuHE2H299D2");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
 #[program]
 pub mod counter_anchor {
+    use anchor_lang::{system_program};
     use dd_merkle_tree::MerkleProof;
 
     use super::*;
@@ -49,6 +50,20 @@ pub mod counter_anchor {
         amount: u64, 
         user: Pubkey
     ) -> Result<()> {
+        let user_lamports = ctx.accounts.user.lamports();
+        require!(user_lamports >= amount, ErrorCode::InsufficientFunds);
+        msg!("before transfer, user lamports: {:?}, wallet lamports: {:?}", user_lamports, ctx.accounts.wallet_account.lamports());
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer{
+                    from: ctx.accounts.user.to_account_info(),
+                    to: ctx.accounts.wallet_account.to_account_info(),
+                }
+            ),
+            amount,
+        )?;
+        msg!("after transfer, user lamports: {:?}, wallet lamports: {:?}", ctx.accounts.user.lamports(), ctx.accounts.wallet_account.lamports());
         // let summary = &mut ctx.accounts.summary;
         // summary.load_mut()?.leaf_chunk_accounts[amount as usize] = 3u8;
         // msg!("value:{}", summary.load_mut()?.leaf_chunk_accounts[amount as usize]);
@@ -82,7 +97,10 @@ pub mod counter_anchor {
 
         let leaf_count: u64 = summary.load_mut()?.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leaf_hashes.len() as u64 - 1 ;
         summary.load_mut()?.leaf_count = leaf_count;
+        let clock = Clock::get()?;
         emit!(DepositEvent{
+            slot: clock.slot,
+            label: EventEnum::DEPOSITEVENT as u64,
             amount, 
             user, 
             deposit_index: leaf_count, 
@@ -98,45 +116,25 @@ pub mod counter_anchor {
         Ok(())
     }
 
-    pub fn verify_merkle_proof(
-        ctx: Context<Deposit>, 
-        deposit_amount: u64,
-        user_addr: Pubkey,
-        proof_index: u32,
-        proof_hashes: Vec<u8>,
-     ) -> Result<()> {
-        msg!("deposit_amount:{}", deposit_amount);
-        msg!("user_addr: {:?}", user_addr);
-        msg!("proof_index: {}", proof_index);
-        msg!("proof_hashes: {:?}", proof_hashes);
-        
-        let accs_deposit = &mut ctx.accounts.summary;
-
-        // recover the proof
-        let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, proof_index, proof_hashes);
-        let leaf_hash = DepositInfo{user: user_addr, amount: deposit_amount}.double_hash_array();
-        let tmp_root = proof.merklize_hash(&leaf_hash).unwrap();
-
-        // check proof root
-        assert_eq!(32, tmp_root.len());
-        let mut proof_root = [0u8; 32];
-        proof_root.copy_from_slice(&tmp_root);
-        //assert_eq!(accs_deposit.merkle_root, proof_root);
-
-        // todo mint spl token
+    pub fn withdraw<'info>(ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>, amount: u64) -> Result<()> {
+        let wallet_lamports = ctx.accounts.wallet_account.lamports();
+        require!(wallet_lamports >= amount, ErrorCode::InsufficientFunds);
+        msg!("before withdraw, wallet lamports: {:?}, user lamports: {:?}", ctx.accounts.wallet_account.lamports(), ctx.accounts.user.lamports());
+        **ctx.accounts.wallet_account.try_borrow_mut_lamports()? -= amount;
+        **ctx.accounts.user.try_borrow_mut_lamports()? += amount;
+        msg!("after withdraw, wallet lamports: {:?}, user lamports: {:?}", ctx.accounts.wallet_account.lamports(), ctx.accounts.user.lamports());
         Ok(())
-
     }
 }
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub admin: Signer<'info>,
 
     #[account(
         init,
-        payer = payer,
+        payer = admin,
         space = 10 * (1024 as usize),
     )]
     pub summary: AccountLoader<'info, SummaryAccount>,
@@ -148,6 +146,12 @@ pub struct Initialize<'info> {
 pub struct Deposit<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+    /// CHECK: Use owner constraint to check account is owned by our program
+    #[account(
+        mut,
+        owner = id()
+    )]
+    pub wallet_account: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     #[account(
         init_if_needed, 
@@ -159,6 +163,18 @@ pub struct Deposit<'info> {
     pub leaf_chunk: Account<'info, LeafChunkAccount>,
     #[account(mut)]
     pub summary: AccountLoader<'info, SummaryAccount>,
+}
+
+#[derive(Accounts)]
+pub struct Withdraw<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    /// CHECK: Use owner constraint to check account is owned by our program
+    #[account(
+        mut,
+        owner = id()
+    )]
+    pub wallet_account: UncheckedAccount<'info>,
 }
 
 #[account(zero_copy(unsafe))]
@@ -175,10 +191,10 @@ pub struct IncreaseSummaryAccount<'info> {
     #[account(mut, 
         realloc = len as usize, 
         realloc::zero = true, 
-        realloc::payer=signer)]
+        realloc::payer=admin)]
     pub summary: AccountLoader<'info, SummaryAccount>,
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub admin: Signer<'info>,
     #[account(address = system_program::ID)]
     pub system_program: Program<'info, System>,
 }
@@ -194,11 +210,19 @@ pub struct LeafChunkAccount {
 
 #[event]
 pub struct DepositEvent {
+    pub slot: u64,
+    pub label: u64,
     pub amount: u64,
     pub user: Pubkey,
     pub deposit_index: u64,
     pub merkle_root: [u8; 32],
     pub leaf_account_pubkey: Pubkey,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
+#[repr(u64)]
+pub enum EventEnum {
+    DEPOSITEVENT = 1u64,
 }
 
 #[error_code]
@@ -207,6 +231,8 @@ pub enum ErrorCode {
     ChunkFull,
     #[msg("Leaf not found")]
     LeafNotFound,
+    #[msg("Insufficient Funds")]
+    InsufficientFunds,
 }
 pub struct DepositInfo {
     user: Pubkey,
