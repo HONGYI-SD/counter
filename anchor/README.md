@@ -16,9 +16,3 @@
 - ~~验证 proof 正确性~~
 - ~~验证通过，mint SPL token~~
 
-# offchain 改造
-编译&执行
-```sh
-npx tsc init.ts --resolveJsonModule --esModuleInterop
-node init.js
-```
