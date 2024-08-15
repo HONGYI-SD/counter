@@ -81,9 +81,10 @@ describe('counter_anchor', () => {
       
       await program.methods.verifyMerkleProof(
         new BN(depositAmount), 
-        randomIndex, admin.publicKey, 
-        Buffer.from(proof_hashes
-      ))
+        randomIndex, // depositIndex
+        admin.publicKey, 
+        Buffer.from(proof_hashes)
+      )
       .accounts({
         l2Summary: summaryKeypair.publicKey,
         mint: mint.publicKey,
