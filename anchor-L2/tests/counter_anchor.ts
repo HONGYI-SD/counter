@@ -16,13 +16,13 @@ describe('counter_anchor', () => {
   const program = anchor.workspace.CounterAnchor as Program<CounterAnchor>;
   console.log("program id:", program.programId.toString())
 
-  const secretKeyString = 
-  "[175,173,102,42,29,108,247,25,22,99,177,144,33,142,149,69,189,179,28,71,228,231,131,82,184,21,159,142,63,84,70,146,252,83,39,91,59,171,81,150,251,106,214,121,80,228,159,176,172,89,108,233,211,44,254,237,198,89,74,169,9,104,4,60]"
-  const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
+  const summarySecretKeyString = 
+  "[224,163,8,56,30,168,104,91,179,176,210,66,200,55,238,65,243,51,67,76,30,212,46,186,195,50,156,36,14,168,234,135,26,93,214,247,198,72,206,120,137,211,122,22,48,242,173,205,52,146,195,18,71,83,132,65,197,21,214,70,155,92,202,21]"
+  const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(summarySecretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
   
   const mintSecretKeyString = 
-  "[132,242,207,58,97,77,31,118,176,13,192,171,106,174,213,173,214,236,233,73,208,88,0,73,220,35,11,253,91,221,108,114,109,91,2,127,83,74,222,42,130,0,227,17,184,200,152,148,33,0,107,186,64,165,253,212,113,129,61,207,158,65,198,214]";
+  "[52,16,95,235,224,66,63,68,161,73,95,15,222,211,140,70,161,64,118,98,75,128,88,29,211,145,217,215,153,158,138,109,75,152,133,34,140,215,58,218,2,246,123,166,116,69,15,173,104,84,110,137,149,90,121,97,255,210,59,153,195,228,253,48]";
   const mint = Keypair.fromSecretKey(new Uint8Array(JSON.parse(mintSecretKeyString)));
   const userTokenAccount = anchor.web3.Keypair.generate();
   console.log("userTokenAccount: ", userTokenAccount.publicKey.toString());
