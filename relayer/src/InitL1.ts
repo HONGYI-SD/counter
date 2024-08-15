@@ -3,7 +3,6 @@ import { Program } from '@coral-xyz/anchor';
 import { Keypair } from '@solana/web3.js';
 import idl from '../../anchor/target/idl/counter_anchor.json';
 const fs = require("fs");
-//import path from "path";
 const path = require("path");
 
 const init = async () => {
