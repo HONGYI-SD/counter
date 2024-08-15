@@ -3,7 +3,7 @@ import { Program } from '@coral-xyz/anchor';
 import { Keypair } from '@solana/web3.js';
 import idl from '../../anchor-L2/target/idl/counter_anchor.json';
 import type { CounterAnchor } from '../../anchor-L2/target/types/counter_anchor';
-import { createInitializeMintInstruction } from '@solana/spl-token';
+import { AccountLayout, createInitializeAccountInstruction, createInitializeMintInstruction } from '@solana/spl-token';
 //import * as spl from '@solana/spl-token';
 const {
     TOKEN_PROGRAM_ID,
@@ -62,6 +62,27 @@ const init = async () => {
     const tx1 = new anchor.web3.Transaction().add(createMintAccountIx, initMintIx);
 
     await provider.sendAndConfirm(tx1, [admin.payer, mint]);
+
+    const userTokenAccount = anchor.web3.Keypair.generate();
+    console.log("userTokenAccount: ", userTokenAccount.publicKey.toString());
+    const userTokenAccountRent = await provider.connection.getMinimumBalanceForRentExemption(AccountLayout.span);
+    const createUserTokenAccountIx = anchor.web3.SystemProgram.createAccount({
+    fromPubkey: admin.publicKey,
+    newAccountPubkey: userTokenAccount.publicKey,
+    lamports: userTokenAccountRent,
+    space: AccountLayout.span,
+    programId: TOKEN_PROGRAM_ID,
+    });
+    const initUserTokenAccountIx = createInitializeAccountInstruction(
+    userTokenAccount.publicKey,
+    mint.publicKey,
+    admin.publicKey,
+    TOKEN_PROGRAM_ID
+    );
+    const tx = new anchor.web3.Transaction()
+    .add(createUserTokenAccountIx)
+    .add(initUserTokenAccountIx);
+    await provider.sendAndConfirm(tx, [admin.payer, userTokenAccount], {commitment: 'confirmed'});
 
     await program.methods
       .initializeCounter()

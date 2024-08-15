@@ -16,7 +16,7 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const secretKeyString = 
-  "[95,9,3,84,87,239,2,118,224,73,98,69,94,82,191,115,86,42,188,202,147,154,88,96,17,209,212,185,159,203,227,200,0,5,7,202,156,129,107,232,189,102,180,254,121,84,185,188,184,249,206,184,111,252,123,233,108,73,92,26,35,94,83,233]"
+  "[71,34,239,255,228,135,242,218,233,30,106,119,215,46,42,181,228,39,10,77,23,31,186,79,120,220,214,228,224,73,141,167,18,78,46,243,167,82,100,177,185,56,36,104,18,140,248,86,13,78,52,218,79,234,170,103,184,233,33,82,206,6,48,231]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
@@ -80,17 +80,18 @@ describe('counter_anchor', () => {
       const tx = new Transaction().add(createWalletIx);
       await sendAndConfirmTransaction(provider.connection, tx, [payer.payer, programWallet]);
 
-      for (let i = 0; i < 1; i++) {
+      for (let i = 0; i < 20; i++) {
         await sendDeposit(program, summaryKeypair, programWallet, payer, 10);
+        await new Promise((resolve) => setTimeout(resolve, 1000*3));
       }
 
-      await program.methods.withdraw(new anchor.BN(2))
-      .accounts({
-        user: payer.publicKey,
-        walletAccount: programWallet.publicKey,
-      })
-      //.signers([programWallet])
-      .rpc();
+      // await program.methods.withdraw(new anchor.BN(2))
+      // .accounts({
+      //   user: payer.publicKey,
+      //   walletAccount: programWallet.publicKey,
+      // })
+      // //.signers([programWallet])
+      // .rpc();
 
       const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
       const leafPda = anchor.web3.PublicKey.findProgramAddressSync(

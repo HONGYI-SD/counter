@@ -10,12 +10,15 @@ import type { CounterAnchor } from '../../anchor/target/types/counter_anchor';
 import type { CounterAnchor as CounterAnchorL2} from '../../anchor-L2/target/types/counter_anchor';
 import { program } from '@coral-xyz/anchor/dist/cjs/native/system';
 import { HashingAlgorithm, MerkleTree, MerkleProof } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
+const {
+    TOKEN_PROGRAM_ID,
+  } = require('@solana/spl-token');
 const fs = require("fs");
 const path = require("path");
 const CHUNK_SIZE = 10;
-const L2SUMMARYPUBKEY = "";
-const MINTPUBKEY = "";
-const USERTOKENACCOUNTPUBKEY = "";
+const L2SUMMARYPUBKEY = "BH2ZpMghTeiZkZoyrPU9GYNWEb7uW1zdHihnHjSjyrsD";
+const MINTPUBKEY = "8tzWeYYW8rdArzkh6VpsepPoi2RkMF1HgSqaU68d4UyM";
+const USERTOKENACCOUNTPUBKEY = "7pBYi1TUciTDydPSqdSSEY62Y1hPnxJfCKgSCKpRfMqk";
 
 const l1ClusterUrl = "http://127.0.0.1:8899";
 const l1Connection = new anchor.web3.Connection(l1ClusterUrl, "confirmed");
@@ -43,7 +46,8 @@ console.log("l2Payer: ", l2Payer.publicKey.toString());
 const programL2 = new Program(idlL2 as anchor.Idl, l2Provider) as unknown as Program<CounterAnchorL2>;
 console.log("l2 program id: ", programL2.programId.toString());
 
-const localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
+let localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
+//let localTree: MerkleTree;
 
 const initRelayer = async () => {
     // todo: init db
@@ -66,12 +70,13 @@ const listenEvent = async () => {
             console.log('event amount:', event.amount.toNumber());
             console.log("event user", event.user.toString());
             
-            if (depositIndex % CHUNK_SIZE === 0){
-                localTree.free();
+            if (depositIndex != 0 && depositIndex % CHUNK_SIZE === 0){
+                //localTree.free();
+                localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
                 console.log("reset merkle tree, reached chunk size ", depositIndex);
             }
             const addrU8Arr = bs58.decode(event.user.toString());
-            console.log("addrU8Arr: ", addrU8Arr.toString());
+            //console.log("addrU8Arr: ", addrU8Arr.toString());
             const amountByteArr = event.amount.toArray('le', 8);
             const amountUint8Array = new Uint8Array(amountByteArr);
             const totalU8Arr = new Uint8Array(amountUint8Array.length + addrU8Arr.length);
@@ -80,13 +85,25 @@ const listenEvent = async () => {
             localTree.add_leaf(totalU8Arr);
             localTree.merklize();
             
-            console.log("new root:", localTree.get_merkle_root().toString());
-    
-    
-            const proof: MerkleProof = localTree.merkle_proof_index(depositIndex);
-            console.log("pairing hashes: ", proof.get_pairing_hashes());
+            //console.log("new root:", localTree.get_merkle_root().toString());
+            const proof: MerkleProof = localTree.merkle_proof_index(depositIndex % CHUNK_SIZE);
+            //console.log("pairing hashes: ", proof.get_pairing_hashes());
             console.log("pairing hashes length: ", proof.get_pairing_hashes().length);
 
+            // tmp update L2 summary root
+            const root = localTree.get_merkle_root();
+            console.log("relayer root: ", root);
+            await programL2.methods.updateLeafpdaMerkleRoot(Buffer.from(root), new anchor.BN(depositIndex))
+            .accounts({
+                l2Summary: new anchor.web3.PublicKey(L2SUMMARYPUBKEY),
+                mint: new anchor.web3.PublicKey(MINTPUBKEY),
+                userTokenAccount: new anchor.web3.PublicKey(USERTOKENACCOUNTPUBKEY),
+                // @ts-ignore
+                tokenProgram: TOKEN_PROGRAM_ID, 
+            })
+            .rpc();
+            const l2summary = programL2.account.l2SummaryAccount.fetch(new anchor.web3.PublicKey(L2SUMMARYPUBKEY));
+            //console.log("l2summary: ", [...(await l2summary).merkleRootsContainer]);
             // send to verify
             let proof_hashes = proof.get_pairing_hashes();
             await programL2.methods.verifyMerkleProof(
