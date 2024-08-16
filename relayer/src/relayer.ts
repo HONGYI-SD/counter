@@ -16,9 +16,9 @@ const {
 const fs = require("fs");
 const path = require("path");
 const CHUNK_SIZE = 10;
-const L2SUMMARYPUBKEY = "BH2ZpMghTeiZkZoyrPU9GYNWEb7uW1zdHihnHjSjyrsD";
-const MINTPUBKEY = "8tzWeYYW8rdArzkh6VpsepPoi2RkMF1HgSqaU68d4UyM";
-const USERTOKENACCOUNTPUBKEY = "7pBYi1TUciTDydPSqdSSEY62Y1hPnxJfCKgSCKpRfMqk";
+const L2SUMMARYPUBKEY = "9tf2X3ZcX7KEfrS3kn9WcSSQfUMKLn8nkPMfqh4pJFZq";
+const MINTPUBKEY = "FdkUSZGa2gxoQ965b9F85Hm6VdQHyJ2YZ7Ub5iQ7YRpJ";
+const USERTOKENACCOUNTPUBKEY = "EfBBBLQmJQDTctT7e9eAAgQAu2Kyni98bCZstVqLcquJ";
 
 const l1ClusterUrl = "http://127.0.0.1:8899";
 const l1Connection = new anchor.web3.Connection(l1ClusterUrl, "confirmed");
@@ -124,7 +124,8 @@ const listenEvent = async () => {
     
           });
         
-        await new Promise((resolve) => setTimeout(resolve, 1000*60*5));
+        //await new Promise((resolve) => setTimeout(resolve, 1000*60*5));
+        await new Promise(() => {});
         programL1.removeEventListener(listenDepositEvent);
     }catch(error){
         console.log("error: ", error.toString());

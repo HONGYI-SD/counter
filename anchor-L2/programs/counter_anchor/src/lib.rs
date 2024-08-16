@@ -5,7 +5,7 @@ use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 
-declare_id!("VphJHWrFwGrV1omKJV627yx1ywU68M4TUbe5wA8SNYD");
+declare_id!("32HZ1GaUJP5BXFVSSE6ts96CTxLeC8YGatqF9pLRxzBQ");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy for test
 const HASH_SIZE: usize = 32;
@@ -36,7 +36,7 @@ pub mod counter_anchor {
         deposit_index: u64,
     ) -> Result<()> {
         let l2_summary = &mut ctx.accounts.l2_summary;
-        let start = deposit_index as usize / CHUNK_SIZE;
+        let start = deposit_index as usize / CHUNK_SIZE * HASH_SIZE;
         msg!("update root, start: {:?}, end: {:?}", start, start + HASH_SIZE);
         msg!("update root: {:?}", root);
         l2_summary.load_mut()?.merkle_roots_container[start..(start + HASH_SIZE)].copy_from_slice(&root);
@@ -55,7 +55,7 @@ pub mod counter_anchor {
         msg!("proof_hashes: {:?}", proof_hashes);
         
         let l2summary = &mut ctx.accounts.l2_summary;
-        let start = deposit_index as usize / CHUNK_SIZE;
+        let start = deposit_index as usize / CHUNK_SIZE * HASH_SIZE;
         let root_on_chain = &l2summary.load_mut()?.merkle_roots_container[start..(start + HASH_SIZE)];
         msg!("root on chain, start: {:?}, end: {:?}", start, start + HASH_SIZE);
         msg!("root on chain: {:?}", root_on_chain);
