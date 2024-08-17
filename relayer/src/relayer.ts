@@ -10,15 +10,16 @@ import type { CounterAnchor } from '../../anchor/target/types/counter_anchor';
 import type { CounterAnchor as CounterAnchorL2} from '../../anchor-L2/target/types/counter_anchor';
 import { program } from '@coral-xyz/anchor/dist/cjs/native/system';
 import { HashingAlgorithm, MerkleTree, MerkleProof } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
+import DepositService from './pgsql/DepositService';
 const {
     TOKEN_PROGRAM_ID,
   } = require('@solana/spl-token');
 const fs = require("fs");
 const path = require("path");
 const CHUNK_SIZE = 10;
-const L2SUMMARYPUBKEY = "9tf2X3ZcX7KEfrS3kn9WcSSQfUMKLn8nkPMfqh4pJFZq";
-const MINTPUBKEY = "FdkUSZGa2gxoQ965b9F85Hm6VdQHyJ2YZ7Ub5iQ7YRpJ";
-const USERTOKENACCOUNTPUBKEY = "EfBBBLQmJQDTctT7e9eAAgQAu2Kyni98bCZstVqLcquJ";
+const L2SUMMARYPUBKEY = "DsDzboU7PDsSkcvJds5pJrizeMcxDVHhW59rS92aQRdF";
+const MINTPUBKEY = "3Srun91SqvSLKGAXv5Z8boa9vws7pmpaZt6osbjTfHaz";
+const USERTOKENACCOUNTPUBKEY = "hkQP2ttfF2HCfzVEiSMfQgroMF7hhahirNprJeifoLJ";
 
 const l1ClusterUrl = "http://127.0.0.1:8899";
 const l1Connection = new anchor.web3.Connection(l1ClusterUrl, "confirmed");
@@ -47,7 +48,7 @@ const programL2 = new Program(idlL2 as anchor.Idl, l2Provider) as unknown as Pro
 console.log("l2 program id: ", programL2.programId.toString());
 
 let localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);
-//let localTree: MerkleTree;
+const depositService = new DepositService();
 
 const initRelayer = async () => {
     // todo: init db
@@ -70,6 +71,14 @@ const listenEvent = async () => {
             console.log('event amount:', event.amount.toNumber());
             console.log("event user", event.user.toString());
             
+            // store deposit in pg
+            await depositService.createDeposit({
+                deposit_index: depositIndex,
+                deposit_amount: event.amount.toNumber(),
+                user_addr: event.user.toString(),
+                leaf_chunk_pda_addr: event.leafAccountPubkey.toString(),
+                current_merkle_root: event.merkleRoot.toString()
+            });
             if (depositIndex != 0 && depositIndex % CHUNK_SIZE === 0){
                 //localTree.free();
                 localTree = new MerkleTree(HashingAlgorithm.Sha256d, 32);

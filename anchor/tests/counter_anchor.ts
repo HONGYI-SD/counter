@@ -16,7 +16,7 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const secretKeyString = 
-  "[81,209,156,96,228,81,148,96,66,152,57,7,135,174,246,215,170,29,189,51,80,123,105,49,207,193,111,241,37,196,225,76,167,121,126,189,38,228,83,185,54,181,23,112,144,171,47,12,142,146,128,231,223,59,31,201,81,143,10,212,0,203,42,99]"
+  "[43,216,232,173,52,130,120,195,103,183,51,153,166,24,178,161,148,156,218,180,40,74,40,2,94,29,98,26,205,153,248,169,130,3,138,216,130,227,110,37,92,118,72,152,120,191,25,20,23,9,235,188,219,80,202,52,99,82,190,200,18,91,173,37]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
