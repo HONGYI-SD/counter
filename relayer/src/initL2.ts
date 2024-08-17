@@ -4,6 +4,7 @@ import { Keypair } from '@solana/web3.js';
 import idl from '../../anchor-L2/target/idl/counter_anchor.json';
 import type { CounterAnchor } from '../../anchor-L2/target/types/counter_anchor';
 import { AccountLayout, createInitializeAccountInstruction, createInitializeMintInstruction } from '@solana/spl-token';
+import updateEnvVariable from '../utils/envcfg'
 //import * as spl from '@solana/spl-token';
 const {
     TOKEN_PROGRAM_ID,
@@ -38,10 +39,12 @@ const init = async () => {
     const secretKeyString = JSON.stringify(Array.from(l2summaryKeypair.secretKey));
     console.log("l2summary account secretKeyString:", secretKeyString)
     console.log("l2summary pubkey: ", l2summaryKeypair.publicKey.toString());
+    updateEnvVariable("L2SUMMARYPUBKEY", l2summaryKeypair.publicKey.toString());
     // create mint account keypair
     const mint = anchor.web3.Keypair.generate();
     console.log("mint account secretKeyString:", JSON.stringify(Array.from(mint.secretKey)));
     console.log("mint pubkey: ", mint.publicKey.toString());
+    updateEnvVariable("MINTPUBKEY", mint.publicKey.toString());
 
     const mintRent = await provider.connection.getMinimumBalanceForRentExemption(MintLayout.span);
     const createMintAccountIx = anchor.web3.SystemProgram.createAccount({
@@ -65,6 +68,7 @@ const init = async () => {
 
     const userTokenAccount = anchor.web3.Keypair.generate();
     console.log("userTokenAccount: ", userTokenAccount.publicKey.toString());
+    updateEnvVariable("USERTOKENACCOUNTPUBKEY", userTokenAccount.publicKey.toString());
     const userTokenAccountRent = await provider.connection.getMinimumBalanceForRentExemption(AccountLayout.span);
     const createUserTokenAccountIx = anchor.web3.SystemProgram.createAccount({
     fromPubkey: admin.publicKey,

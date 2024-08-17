@@ -11,15 +11,20 @@ import type { CounterAnchor as CounterAnchorL2} from '../../anchor-L2/target/typ
 import { program } from '@coral-xyz/anchor/dist/cjs/native/system';
 import { HashingAlgorithm, MerkleTree, MerkleProof } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 import DepositService from './pgsql/DepositService';
+import * as dotenv from 'dotenv'
 const {
     TOKEN_PROGRAM_ID,
   } = require('@solana/spl-token');
 const fs = require("fs");
 const path = require("path");
 const CHUNK_SIZE = 10;
-const L2SUMMARYPUBKEY = "DsDzboU7PDsSkcvJds5pJrizeMcxDVHhW59rS92aQRdF";
-const MINTPUBKEY = "3Srun91SqvSLKGAXv5Z8boa9vws7pmpaZt6osbjTfHaz";
-const USERTOKENACCOUNTPUBKEY = "hkQP2ttfF2HCfzVEiSMfQgroMF7hhahirNprJeifoLJ";
+dotenv.config();
+const L2SUMMARYPUBKEY = process.env.L2SUMMARYPUBKEY;
+const MINTPUBKEY = process.env.MINTPUBKEY;
+const USERTOKENACCOUNTPUBKEY = process.env.USERTOKENACCOUNTPUBKEY;
+console.log("L2SUMMARYPUBKEY:", L2SUMMARYPUBKEY);
+console.log("MINTPUBKEY:", MINTPUBKEY);
+console.log("USERTOKENACCOUNTPUBKEY:", USERTOKENACCOUNTPUBKEY);
 
 const l1ClusterUrl = "http://127.0.0.1:8899";
 const l1Connection = new anchor.web3.Connection(l1ClusterUrl, "confirmed");
