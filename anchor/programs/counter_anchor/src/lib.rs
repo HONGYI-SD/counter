@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("33bwyrafRxtDkwwpqcBnwhwpemna4vN2RhuHE2H299D2");
+declare_id!("EpVXTaZfPiszTp9gs9Mst2FnUxf2QpXSgcwEHZBrs1WM");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 

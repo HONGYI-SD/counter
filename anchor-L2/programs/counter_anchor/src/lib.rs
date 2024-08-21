@@ -2,10 +2,10 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
-use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
+use dd_merkle_tree::{HashingAlgorithm};
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 
-declare_id!("32HZ1GaUJP5BXFVSSE6ts96CTxLeC8YGatqF9pLRxzBQ");
+declare_id!("G1HWwVwwE7jEszCuiJzFPUqvec5Qq9RosQZrutkpPJDb");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy for test
 const HASH_SIZE: usize = 32;
@@ -32,21 +32,35 @@ pub mod counter_anchor {
 
     pub fn update_leafpda_merkle_root<'info>(
         ctx: Context<'_, '_, 'info, 'info, UpdataRoot<'info>>, 
-        root: Vec<u8>,
         deposit_index: u64,
+        root: Vec<u8>,
     ) -> Result<()> {
         let l2_summary = &mut ctx.accounts.l2_summary;
+        let root_chunk_acc = &mut ctx.accounts.root_chunk;
+        // avoid repeat update
+        msg!("root_chunk_acc.root_infos.len(): {:?}", root_chunk_acc.root_infos.len());
+        msg!("deposit_index as usize % CHUNK_SIZE: {:?}", deposit_index as usize % CHUNK_SIZE);
+        require_eq!(root_chunk_acc.root_infos.len(), deposit_index as usize % CHUNK_SIZE );
+        let root_info = RootInfo{
+            root: root.try_into().map_err(|_| "Conversion failed").unwrap(),
+            is_minted: false,
+        };
+        root_chunk_acc.root_infos.push(root_info);
+        
         let start = deposit_index as usize / CHUNK_SIZE * HASH_SIZE;
-        msg!("update root, start: {:?}, end: {:?}", start, start + HASH_SIZE);
-        msg!("update root: {:?}", root);
-        l2_summary.load_mut()?.merkle_roots_container[start..(start + HASH_SIZE)].copy_from_slice(&root);
+        msg!("update root chunk pdas, start: {:?}, end: {:?}", start, start + HASH_SIZE);
+        //msg!("update root: {:?}", root);
+        l2_summary.load_mut()?.root_chunk_pdas[start..(start + HASH_SIZE)].copy_from_slice(&root_chunk_acc.key().to_bytes());
+        if root_chunk_acc.root_infos.len() == CHUNK_SIZE {
+            l2_summary.load_mut()?.root_chunk_count += 1u64;
+        }
         Ok(())
     }
 
     pub fn verify_merkle_proof(
         ctx: Context<UpdataRoot>, 
+        deposit_index: u64,
         deposit_amount: u64,
-        deposit_index: u32,
         user_addr: Pubkey,
         proof_hashes: Vec<u8>,
      ) -> Result<()> {
@@ -54,14 +68,13 @@ pub mod counter_anchor {
         msg!("user_addr: {:?}", user_addr);
         msg!("proof_hashes: {:?}", proof_hashes);
         
-        let l2summary = &mut ctx.accounts.l2_summary;
-        let start = deposit_index as usize / CHUNK_SIZE * HASH_SIZE;
-        let root_on_chain = &l2summary.load_mut()?.merkle_roots_container[start..(start + HASH_SIZE)];
-        msg!("root on chain, start: {:?}, end: {:?}", start, start + HASH_SIZE);
-        msg!("root on chain: {:?}", root_on_chain);
+        let root_chunk = &mut ctx.accounts.root_chunk;
+        require!(root_chunk.root_infos.len() >= deposit_index as usize % CHUNK_SIZE, ErrorCode::LeafNotFound);
+        let root_info = &mut root_chunk.root_infos[deposit_index as usize % CHUNK_SIZE];
+        msg!("root on chain: {:?}", root_info.root);
 
         // recover the proof
-        let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, deposit_index, proof_hashes);
+        let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, deposit_index.try_into()?, proof_hashes);
         let leaf_hash = DepositInfo{user: user_addr, amount: deposit_amount}.double_hash_array();
         let tmp_root = proof.merklize_hash(&leaf_hash).unwrap();
         msg!("proof root: {:?}", tmp_root);
@@ -70,17 +83,21 @@ pub mod counter_anchor {
         assert_eq!(32, tmp_root.len());
         let mut proof_root = [0u8; 32];
         proof_root.copy_from_slice(&tmp_root);
-        assert_eq!(root_on_chain, proof_root);
+        assert_eq!(root_info.root, proof_root);
 
-        // todo mint spl token
-        let cpi_accounts = MintTo{
-            mint: ctx.accounts.mint.to_account_info(),
-            to: ctx.accounts.user_token_account.to_account_info(),
-            authority: ctx.accounts.admin.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::mint_to(cpi_ctx, deposit_amount)?;
+        if root_info.is_minted == true {
+            msg!("reject repeat mint, deposit index {:?}", deposit_index)
+        }else{
+            let cpi_accounts = MintTo{
+                mint: ctx.accounts.mint.to_account_info(),
+                to: ctx.accounts.user_token_account.to_account_info(),
+                authority: ctx.accounts.admin.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            token::mint_to(cpi_ctx, deposit_amount)?;
+            root_info.is_minted = true;
+        }
 
         Ok(())
 
@@ -101,15 +118,22 @@ pub struct L2Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-
-
 #[derive(Accounts)]
+#[instruction(deposit_index: u64)]
 pub struct UpdataRoot<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
     pub l2_summary: AccountLoader<'info, L2SummaryAccount>,
+    #[account(
+        init_if_needed, 
+        payer = admin, 
+        space = 8 + RootChunkAccount::INIT_SPACE, 
+        seeds = [b"root", l2_summary.key().as_ref(), (deposit_index / (CHUNK_SIZE as u64)).to_le_bytes().as_ref()],
+        bump)
+    ]
+    pub root_chunk: Account<'info, RootChunkAccount>,
     #[account(mut)]
     pub mint: Account<'info, Mint>,
     #[account(mut)]
@@ -120,9 +144,24 @@ pub struct UpdataRoot<'info> {
 #[account(zero_copy(unsafe))]
 #[repr(C)]
 pub struct L2SummaryAccount {
-    pub leaf_chunk_count: u64,
-    pub leaf_count: u64,
-    pub merkle_roots_container: [u8; 10240 * 10 - 8 - 8 - 8], // about 10KB
+    pub root_chunk_count: u64,
+    pub root_count: u64,
+    pub root_chunk_pdas: [u8; 10240 * 10 - 8 - 8 - 8], // about 10KB
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
+pub struct RootInfo {
+    root: [u8; 32],
+    is_minted: bool,
+}
+#[account]
+#[derive(InitSpace)]
+pub struct RootChunkAccount {
+    #[max_len(CHUNK_SIZE)]
+    pub root_infos: Vec<RootInfo>,
+    pub is_fulled: bool,
+    pub deposit_index: u64,
 }
 
 #[derive(Accounts)]
