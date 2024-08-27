@@ -107,7 +107,7 @@ const listenEvent = async () => {
             // tmp update L2 summary root
             const root = localTree.get_merkle_root();
             console.log("relayer root: ", root);
-            await programL2.methods.updateLeafpdaMerkleRoot(Buffer.from(root), new anchor.BN(depositIndex))
+            await programL2.methods.updateMerkleRoot(new anchor.BN(depositIndex), Buffer.from(root))
             .accounts({
                 l2Summary: new anchor.web3.PublicKey(L2SUMMARYPUBKEY),
                 mint: new anchor.web3.PublicKey(MINTPUBKEY),
@@ -121,8 +121,8 @@ const listenEvent = async () => {
             // send to verify
             let proof_hashes = proof.get_pairing_hashes();
             await programL2.methods.verifyMerkleProof(
+                new anchor.BN(depositIndex),
                 new anchor.BN(event.amount), 
-                depositIndex, 
                 event.user, 
                 Buffer.from(proof_hashes)
             )

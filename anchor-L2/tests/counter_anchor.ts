@@ -94,7 +94,7 @@ describe('counter_anchor', () => {
 
         await program.methods.verifyMerkleProof(
           new anchor.BN(depositIndex), // depositIndex
-            new BN(10),
+            new anchor.BN(10),
             admin.publicKey,
             Buffer.from(proof_hashes)
           )
