@@ -18,20 +18,18 @@ pub mod counter_anchor {
     use super::*;
 
     pub fn initialize_counter(_ctx: Context<L2Initialize>) -> Result<()> {
-        
         Ok(())
     }
 
     pub fn increase_l2_summary_account_space(
         _ctx: Context<IncreaseL2SummaryAccount>,
-        len: u32
+        _len: u32
     ) -> Result<()> {
-        msg!("increase_summary_account_space:{}", len);
         Ok(())
     }
 
-    pub fn update_leafpda_merkle_root<'info>(
-        ctx: Context<'_, '_, 'info, 'info, UpdataRoot<'info>>, 
+    pub fn update_merkle_root<'info>(
+        ctx: Context<'_, '_, 'info, 'info, UpdateRoot<'info>>,
         deposit_index: u64,
         root: Vec<u8>,
     ) -> Result<()> {
@@ -47,10 +45,13 @@ pub mod counter_anchor {
         };
         root_chunk_acc.root_infos.push(root_info);
         
-        let start = deposit_index as usize / CHUNK_SIZE * HASH_SIZE;
-        msg!("update root chunk pdas, start: {:?}, end: {:?}", start, start + HASH_SIZE);
-        //msg!("update root: {:?}", root);
-        l2_summary.load_mut()?.root_chunk_pdas[start..(start + HASH_SIZE)].copy_from_slice(&root_chunk_acc.key().to_bytes());
+        // l2_summary need to store root_chunk_acc.key
+        if deposit_index as usize % CHUNK_SIZE == 0{
+            let start = deposit_index as usize / CHUNK_SIZE * HASH_SIZE;
+            msg!("update root chunk pdas, start: {:?}, end: {:?}", start, start + HASH_SIZE);
+            l2_summary.load_mut()?.root_chunk_pdas[start..(start + HASH_SIZE)].copy_from_slice(&root_chunk_acc.key().to_bytes());
+        }
+        
         if root_chunk_acc.root_infos.len() == CHUNK_SIZE {
             l2_summary.load_mut()?.root_chunk_count += 1u64;
         }
@@ -58,7 +59,7 @@ pub mod counter_anchor {
     }
 
     pub fn verify_merkle_proof(
-        ctx: Context<UpdataRoot>, 
+        ctx: Context<UpdateRoot>, 
         deposit_index: u64,
         deposit_amount: u64,
         user_addr: Pubkey,
@@ -68,22 +69,22 @@ pub mod counter_anchor {
         msg!("user_addr: {:?}", user_addr);
         msg!("proof_hashes: {:?}", proof_hashes);
         
-        let root_chunk = &mut ctx.accounts.root_chunk;
-        require!(root_chunk.root_infos.len() >= deposit_index as usize % CHUNK_SIZE, ErrorCode::LeafNotFound);
-        let root_info = &mut root_chunk.root_infos[deposit_index as usize % CHUNK_SIZE];
+        let root_chunk_acc = &mut ctx.accounts.root_chunk;
+        require!(root_chunk_acc.root_infos.len() >= deposit_index as usize % CHUNK_SIZE, ErrorCode::LeafNotFound);
+        let root_info = &mut root_chunk_acc.root_infos[deposit_index as usize % CHUNK_SIZE];
         msg!("root on chain: {:?}", root_info.root);
 
         // recover the proof
         let proof = MerkleProof::new(HashingAlgorithm::Sha256d, 32, deposit_index.try_into()?, proof_hashes);
         let leaf_hash = DepositInfo{user: user_addr, amount: deposit_amount}.double_hash_array();
-        let tmp_root = proof.merklize_hash(&leaf_hash).unwrap();
-        msg!("proof root: {:?}", tmp_root);
+        let proof_root = proof.merklize_hash(&leaf_hash).unwrap();
+        msg!("proof root: {:?}", proof_root);
 
-        //check proof root
-        assert_eq!(32, tmp_root.len());
-        let mut proof_root = [0u8; 32];
-        proof_root.copy_from_slice(&tmp_root);
-        assert_eq!(root_info.root, proof_root);
+        require!(proof_root.len() == 32, ErrorCode::ProofRootLenErr);
+        let root: [u8; 32] = proof_root.try_into().map_err(|_| "convert failed").unwrap();
+        if root_info.root != root {
+            return Err(error!(ErrorCode::ProofVerifyFailed));
+        }
 
         if root_info.is_minted == true {
             msg!("reject repeat mint, deposit index {:?}", deposit_index)
@@ -120,7 +121,7 @@ pub struct L2Initialize<'info> {
 
 #[derive(Accounts)]
 #[instruction(deposit_index: u64)]
-pub struct UpdataRoot<'info> {
+pub struct UpdateRoot<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -193,6 +194,10 @@ pub enum ErrorCode {
     ChunkFull,
     #[msg("Leaf not found")]
     LeafNotFound,
+    #[msg("Proof root len is error")]
+    ProofRootLenErr,
+    #[msg("Proof verify failed")]
+    ProofVerifyFailed,
 }
 pub struct DepositInfo {
     user: Pubkey,

@@ -17,12 +17,12 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const summarySecretKeyString = 
-  "[91,77,149,98,32,36,73,55,201,65,67,250,84,174,98,135,100,2,156,254,223,21,86,175,206,91,221,157,229,119,209,52,24,192,58,245,255,145,171,151,246,69,156,169,155,241,177,134,189,181,100,235,17,194,222,52,110,161,135,39,54,30,202,176]"
+  "[129,4,187,4,136,38,64,3,160,164,110,196,226,185,39,178,34,95,60,84,161,218,209,85,26,108,5,139,159,189,189,170,142,90,169,57,227,31,160,10,154,6,230,0,126,183,173,140,118,148,174,211,111,40,214,214,110,22,48,243,201,55,241,187]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(summarySecretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
   
   const mintSecretKeyString = 
-  "[53,159,234,20,219,16,222,226,6,59,152,240,151,27,39,81,101,225,60,110,170,92,19,38,191,158,184,9,28,214,155,224,226,40,116,188,144,41,40,124,48,34,251,131,255,234,105,137,223,176,57,179,207,197,154,107,97,107,92,112,48,227,136,180]"
+  "[155,192,98,40,104,148,104,59,155,77,54,24,110,8,7,103,196,2,33,84,25,28,240,93,94,142,243,122,215,169,78,14,46,34,17,137,17,78,142,195,87,197,236,211,192,61,82,116,134,143,190,107,157,45,125,173,215,137,209,255,73,228,10,222]"
   const mint = Keypair.fromSecretKey(new Uint8Array(JSON.parse(mintSecretKeyString)));
   const userTokenAccount = anchor.web3.Keypair.generate();
   console.log("userTokenAccount: ", userTokenAccount.publicKey.toString());
@@ -75,7 +75,7 @@ describe('counter_anchor', () => {
           program.programId
         );
         console.log("rootpda: ", rootPda[0].toString());
-        await program.methods.updateLeafpdaMerkleRoot(new anchor.BN(depositIndex), Buffer.from(root))
+        await program.methods.updateMerkleRoot(new anchor.BN(depositIndex), Buffer.from(root))
           .accounts({
             l2Summary: summaryKeypair.publicKey,
             mint: mint.publicKey,
