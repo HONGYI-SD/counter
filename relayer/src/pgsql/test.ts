@@ -5,7 +5,8 @@ const run = async () => {
 
   // 创建新的存款记录
   const newDeposit = await depositService.createDeposit({
-    deposit_index: 1,
+    slot: 2,
+    deposit_index: 3,
     deposit_amount: 1000,
     user_addr: '0x123',
     leaf_chunk_pda_addr: '0xabc',
@@ -21,16 +22,8 @@ const run = async () => {
   const deposit = await depositService.getDepositById(newDeposit.id!);
   console.log('Deposit by ID:', deposit);
 
-  // 更新存款记录
-  const updatedDeposit = await depositService.updateDeposit(newDeposit.id!, {
-    deposit_index: 2,
-    deposit_amount: 2000,
-    user_addr: '0x456',
-    leaf_chunk_pda_addr: '0xdef',
-    current_merkle_root: '0xghi'
-  });
-  console.log('Updated Deposit:', updatedDeposit);
-
+  const latest = await depositService.getLatestDepositItem();
+  console.log("latest : ", latest);
   // 删除存款记录
   //const isDeleted = await depositService.deleteDeposit(newDeposit.id!);
   //console.log('Is Deposit Deleted:', isDeleted);

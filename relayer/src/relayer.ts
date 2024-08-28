@@ -78,6 +78,7 @@ const listenEvent = async () => {
             
             // store deposit in pg
             await depositService.createDeposit({
+                slot: slot,
                 deposit_index: depositIndex,
                 deposit_amount: event.amount.toNumber(),
                 user_addr: event.user.toString(),
@@ -107,11 +108,23 @@ const listenEvent = async () => {
             // tmp update L2 summary root
             const root = localTree.get_merkle_root();
             console.log("relayer root: ", root);
+
+            const index = new anchor.BN(depositIndex / CHUNK_SIZE);
+            const rootPda = anchor.web3.PublicKey.findProgramAddressSync(
+            [
+                Buffer.from("root"),
+                new anchor.web3.PublicKey(L2SUMMARYPUBKEY).toBuffer(),
+                index.toArrayLike(Buffer, 'le', 8)
+            ],
+            programL2.programId
+            );
+
             await programL2.methods.updateMerkleRoot(new anchor.BN(depositIndex), Buffer.from(root))
             .accounts({
                 l2Summary: new anchor.web3.PublicKey(L2SUMMARYPUBKEY),
                 mint: new anchor.web3.PublicKey(MINTPUBKEY),
                 userTokenAccount: new anchor.web3.PublicKey(USERTOKENACCOUNTPUBKEY),
+                rootChunk: rootPda[0],
                 // @ts-ignore
                 tokenProgram: TOKEN_PROGRAM_ID, 
             })
@@ -130,6 +143,7 @@ const listenEvent = async () => {
                 l2Summary: new anchor.web3.PublicKey(L2SUMMARYPUBKEY),
                 mint: new anchor.web3.PublicKey(MINTPUBKEY),
                 userTokenAccount: new anchor.web3.PublicKey(USERTOKENACCOUNTPUBKEY),
+                rootChunk: rootPda[0],
                 // @ts-ignore
                 tokenProgram: TOKEN_PROGRAM_ID, 
             })
