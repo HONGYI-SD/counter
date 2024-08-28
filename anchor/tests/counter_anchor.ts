@@ -5,7 +5,7 @@ import type { CounterAnchor } from '../target/types/counter_anchor';
 import BN from 'bn.js';
 import { HashingAlgorithm, MerkleTree } from '../../../svm-merkle-tree/dist/node/svm_merkle_tree'
 
-const CHUNK_SIZE = 100;
+const CHUNK_SIZE = 10;
 describe('counter_anchor', () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -16,7 +16,7 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const secretKeyString = 
-  "[102,42,77,115,239,88,139,12,164,215,254,20,118,146,107,205,227,204,205,0,32,174,26,151,24,161,164,11,138,86,189,32,114,249,173,62,166,98,57,16,208,231,205,178,131,255,76,124,255,66,184,223,219,122,11,153,17,126,155,72,248,236,214,169]"
+  "[123,128,56,215,195,160,45,93,135,81,37,236,51,217,212,210,190,188,77,77,135,224,157,87,239,66,194,38,209,243,138,25,156,243,247,66,6,125,50,126,183,190,15,206,215,41,125,179,44,9,128,32,234,34,165,216,131,15,89,127,48,137,137,167]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
@@ -37,6 +37,7 @@ describe('counter_anchor', () => {
         console.log("event eventslot: ", event.slot.toNumber());
         console.log("event label: ", event.label);
         console.log("event label: ", EventEnumReverseMapping[event.label]);
+        console.log("event deposit item hash: ", event.depositItemHash.toString());
         console.log("event depositIndex: ", depositIndex);
         console.log("event leafAccountPubkey: ", event.leafAccountPubkey.toString());
         console.log("event merkle root: ", event.merkleRoot.toString());
@@ -82,7 +83,7 @@ describe('counter_anchor', () => {
 
       for (let i = 0; i < 20; i++) {
         await sendDeposit(program, summaryKeypair, programWallet, payer, 2000);
-        await new Promise((resolve) => setTimeout(resolve, 1000*3));
+        await new Promise((resolve) => setTimeout(resolve, 1000*1));
       }
 
       // await program.methods.withdraw(new anchor.BN(2))
@@ -130,6 +131,7 @@ async function sendDeposit(program: Program<CounterAnchor>, summaryKeypair: Keyp
   ],
     program.programId
   );
+  console.log("leafpda: ", leafPda[0].toString())
   const ret = await program.methods.deposit(new BN(depositAmount), payer.publicKey)
   .accounts({ 
     user: payer.publicKey, 

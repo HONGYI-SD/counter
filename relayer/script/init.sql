@@ -6,6 +6,7 @@ CREATE TABLE deposit (
 	deposit_amount BIGINT NOT NULL,
 	leaf_chunk_pda_addr VARCHAR(44) NULL,
 	current_merkle_root varchar NULL,
+	deposit_item_hash varchar NULL,
 	updated_on TIMESTAMP default current_timestamp
 );
 

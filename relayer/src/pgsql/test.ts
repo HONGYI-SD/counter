@@ -10,7 +10,8 @@ const run = async () => {
     deposit_amount: 1000,
     user_addr: '0x123',
     leaf_chunk_pda_addr: '0xabc',
-    current_merkle_root: '0xdef'
+    current_merkle_root: '0xdef',
+    deposit_item_hash: '0xghi',
   });
   console.log('New Deposit:', newDeposit);
 

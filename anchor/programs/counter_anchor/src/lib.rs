@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
 use dd_merkle_tree::{MerkleTree, HashingAlgorithm};
 
-declare_id!("EpVXTaZfPiszTp9gs9Mst2FnUxf2QpXSgcwEHZBrs1WM");
+declare_id!("GVv2T2hLYSo423qRfZYWD4vhJkev3nfkLo4b79wTS42D");
 
 const CHUNK_SIZE: usize = 10; // temp size, easy to test
 
@@ -30,15 +30,15 @@ pub mod counter_anchor {
         Ok(())
     }
 
-    pub fn view<'info>(
-        ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
-        _amount: u64, 
-        _addr: Pubkey
-    ) -> Result<()> {
-        let leaf_account_info = ctx.remaining_accounts.get(0).unwrap();
-        let leaf_account_data: Account<LeafChunkAccount> = Account::try_from(leaf_account_info)?;
-        msg!("leaf hashes: {:?}", leaf_account_data.leaf_hashes);
-        Ok(())
+    pub fn view_deposit_item<'info>(
+        ctx: Context<'_, '_, 'info, 'info, View<'info>>, 
+        deposit_index: u64, 
+    ) -> Result<[u8; 32]> {
+        let leaf_chunk_account = &ctx.accounts.leaf_chunk;
+        msg!("deposit_index: {:?}", deposit_index);
+        msg!("leaf count: {:?}", leaf_chunk_account.leaf_hashes.len());
+        msg!("leaf hash: {:?}", leaf_chunk_account.leaf_hashes[deposit_index as usize % CHUNK_SIZE]);
+        Ok(leaf_chunk_account.leaf_hashes[deposit_index as usize % CHUNK_SIZE])
     }
 
     // pub fn update_leaf_pda() -> Result<()> {
@@ -103,6 +103,7 @@ pub mod counter_anchor {
             label: EventEnum::DEPOSITEVENT as u64,
             amount, 
             user, 
+            deposit_item_hash: leaf_hash,
             deposit_index: leaf_count, 
             merkle_root: leaf_chunk_account.root, 
             leaf_account_pubkey: leaf_chunk_account.key(),
@@ -141,6 +142,24 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
+
+#[derive(Accounts)]
+#[instruction(deposit_index: u64)]
+pub struct View<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    #[account(
+        init_if_needed, 
+        payer = user, 
+        space = 8 + LeafChunkAccount::INIT_SPACE, 
+        seeds = [b"leaf", summary.key().as_ref(), (deposit_index / (CHUNK_SIZE as u64)).to_le_bytes().as_ref()],
+        bump)
+    ]
+    pub leaf_chunk: Account<'info, LeafChunkAccount>,
+    #[account(mut)]
+    pub summary: AccountLoader<'info, SummaryAccount>,
+}
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
@@ -214,6 +233,7 @@ pub struct DepositEvent {
     pub label: u64,
     pub amount: u64,
     pub user: Pubkey,
+    pub deposit_item_hash: [u8; 32],
     pub deposit_index: u64,
     pub merkle_root: [u8; 32],
     pub leaf_account_pubkey: Pubkey,

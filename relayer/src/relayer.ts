@@ -19,9 +19,11 @@ const fs = require("fs");
 const path = require("path");
 const CHUNK_SIZE = 10;
 dotenv.config();
+const L1SUMMARYPUBKEY = process.env.L1SUMMARYPUBKEY;
 const L2SUMMARYPUBKEY = process.env.L2SUMMARYPUBKEY;
 const MINTPUBKEY = process.env.MINTPUBKEY;
 const USERTOKENACCOUNTPUBKEY = process.env.USERTOKENACCOUNTPUBKEY;
+console.log("L1SUMMARYPUBKEY:", L1SUMMARYPUBKEY);
 console.log("L2SUMMARYPUBKEY:", L2SUMMARYPUBKEY);
 console.log("MINTPUBKEY:", MINTPUBKEY);
 console.log("USERTOKENACCOUNTPUBKEY:", USERTOKENACCOUNTPUBKEY);
@@ -60,7 +62,13 @@ const initRelayer = async () => {
 }
 
 const relayerSync = async () => {
-    // sync merker tree
+    const latestDepositIdxDB = depositService.getLatestDepositItem();
+    const l1SummaryAcc = programL1.account.summaryAccount.fetch(new anchor.web3.PublicKey(L2SUMMARYPUBKEY));
+    const latestDepositIdxChain = (await l1SummaryAcc).leafCount;
+    if (new anchor.BN(await latestDepositIdxDB) < latestDepositIdxChain) {
+        console.log("relayer is behind chain, wait syncing...");
+
+    }
 }
 
 const listenEvent = async () => {
@@ -72,6 +80,7 @@ const listenEvent = async () => {
             console.log("event label: ", event.label);
             console.log("event depositIndex: ", depositIndex);
             console.log("event leafAccountPubkey: ", event.leafAccountPubkey.toString());
+            console.log("event deposit item hash: ", event.depositItemHash.toString());
             console.log("event merkle root: ", event.merkleRoot.toString());
             console.log('event amount:', event.amount.toNumber());
             console.log("event user", event.user.toString());
@@ -83,7 +92,8 @@ const listenEvent = async () => {
                 deposit_amount: event.amount.toNumber(),
                 user_addr: event.user.toString(),
                 leaf_chunk_pda_addr: event.leafAccountPubkey.toString(),
-                current_merkle_root: event.merkleRoot.toString()
+                current_merkle_root: event.merkleRoot.toString(),
+                deposit_item_hash: event.depositItemHash.toString(),
             });
             if (depositIndex != 0 && depositIndex % CHUNK_SIZE === 0){
                 //localTree.free();

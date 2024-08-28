@@ -8,15 +8,16 @@ interface Deposit {
   deposit_amount: number;
   leaf_chunk_pda_addr: string | null;
   current_merkle_root: string | null;
+  deposit_item_hash: string | null;
 }
 
 class DepositService {
   // 创建新的存款记录
   async createDeposit(deposit: Deposit): Promise<Deposit> {
-    const { slot, deposit_index, user_addr, deposit_amount, leaf_chunk_pda_addr, current_merkle_root } = deposit;
+    const { slot, deposit_index, user_addr, deposit_amount, leaf_chunk_pda_addr, current_merkle_root, deposit_item_hash } = deposit;
     const result = await pool.query(
-      'INSERT INTO deposit (slot, deposit_index, user_addr, deposit_amount, leaf_chunk_pda_addr, current_merkle_root) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [slot, deposit_index, user_addr, deposit_amount, leaf_chunk_pda_addr, current_merkle_root]
+      'INSERT INTO deposit (slot, deposit_index, user_addr, deposit_amount, leaf_chunk_pda_addr, current_merkle_root, deposit_item_hash) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [slot, deposit_index, user_addr, deposit_amount, leaf_chunk_pda_addr, current_merkle_root, deposit_item_hash]
     );
     return result.rows[0];
   }
