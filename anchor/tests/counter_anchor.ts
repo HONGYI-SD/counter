@@ -16,7 +16,7 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const secretKeyString = 
-  "[125,234,215,161,25,230,104,136,241,109,38,171,211,113,76,40,71,128,44,13,47,58,50,108,34,84,64,103,19,115,235,41,69,231,18,157,87,102,50,56,160,47,7,149,102,50,70,42,157,8,135,154,57,147,91,253,183,242,234,117,60,109,189,176]"
+  "[62,137,168,88,233,32,199,146,193,104,152,187,195,0,42,111,169,204,87,220,94,38,127,254,232,47,221,79,238,7,142,103,108,226,134,51,38,59,139,135,245,247,171,1,128,124,11,102,86,122,112,52,254,19,37,63,165,238,14,50,33,136,103,175]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
@@ -82,8 +82,8 @@ describe('counter_anchor', () => {
       await sendAndConfirmTransaction(provider.connection, tx, [payer.payer, programWallet]);
 
       for (let i = 0; i < 20; i++) {
-        await sendDeposit(program, summaryKeypair, programWallet, payer, 2000);
-        await new Promise((resolve) => setTimeout(resolve, 1000*1));
+        await sendDeposit(program, summaryKeypair, programWallet, payer, 100);
+        await new Promise((resolve) => setTimeout(resolve, 1000*2));
       }
 
       // await program.methods.withdraw(new anchor.BN(2))

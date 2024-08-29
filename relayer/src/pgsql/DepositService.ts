@@ -2,12 +2,12 @@ import pool from './db';
 
 interface Deposit {
   id?: number;
-  slot: number;
+  slot?: number;
   deposit_index: number;
   user_addr: string | null;
   deposit_amount: number;
-  leaf_chunk_pda_addr: string | null;
-  current_merkle_root: string | null;
+  leaf_chunk_pda_addr?: string | null;
+  current_merkle_root?: string | null;
   deposit_item_hash: string | null;
 }
 
@@ -38,12 +38,12 @@ class DepositService {
   }
 
   // get latest deposit item
-  async getLatestDepositItem(): Promise<number> {
+  async getLatestDepositItem(): Promise<number | null> {
     const result = await pool.query('SELECT MAX(deposit_index) FROM deposit');
     if (result.rows.length){
       return result.rows[0].max;
     }
-    return 0;
+    return null;
   }
   // 更新存款记录
   async updateDeposit(id: number, deposit: Deposit): Promise<Deposit | null> {

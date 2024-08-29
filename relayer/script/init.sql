@@ -1,8 +1,8 @@
 CREATE TABLE deposit (
 	id            bigserial PRIMARY KEY,
-	slot          BIGINT    NOT NULL,
+	slot          BIGINT   NULL,
 	deposit_index BIGINT NOT NULL,
-	user_addr VARCHAR(44) NULL,
+	user_addr VARCHAR(44) NOT NULL,
 	deposit_amount BIGINT NOT NULL,
 	leaf_chunk_pda_addr VARCHAR(44) NULL,
 	current_merkle_root varchar NULL,
