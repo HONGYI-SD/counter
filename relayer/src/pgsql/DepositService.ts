@@ -22,6 +22,14 @@ class DepositService {
     return result.rows[0];
   }
 
+  async range(start: number, end: number): Promise<Deposit[]> {
+    const result = await pool.query(
+      'SELECT * FROM deposit WHERE deposit_index >=$1 AND deposit_index <= $2 ORDER BY deposit_index ASC',
+      [start, end]
+    );
+    return result.rows;
+  }
+  
   // 获取所有存款记录
   async getDeposits(): Promise<Deposit[]> {
     const result = await pool.query('SELECT * FROM deposit');

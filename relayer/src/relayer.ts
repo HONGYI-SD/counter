@@ -87,7 +87,8 @@ function parselog(logs: string[]):[number, string, number, number[]]{
     return [Number(indexlog),userlog, Number(amountlog), hash];
 }
 
-const relayerSync = async () => {
+const relayerSync = async ():Promise<number> => {
+    let depositIndexSynced:number = 0;
     while(true) {
         let latestDepositIdxDB = await depositService.getLatestDepositItem();
         if (latestDepositIdxDB === null) {
@@ -100,6 +101,7 @@ const relayerSync = async () => {
         console.log("on chain latest deposit index is: ", latestDepositIdxChain);
         if (latestDepositIdxDB == latestDepositIdxChain) {
             console.log("there is no sync work");
+            depositIndexSynced = latestDepositIdxChain;
             break;
         }
         for (let index:number = latestDepositIdxDB; index <= latestDepositIdxChain; index++) {
@@ -129,11 +131,28 @@ const relayerSync = async () => {
                 deposit_item_hash: hash.toString(),
             });
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000*1));
+       //await new Promise((resolve) => setTimeout(resolve, 1000*1));
     }
+    return depositIndexSynced;
 }
 
-const listenEvent = async () => {
+const listenEvent = async (depositIndexSynced: number) => {
+    const start_idx = depositIndexSynced / CHUNK_SIZE;
+    const end_idx = depositIndexSynced % CHUNK_SIZE + start_idx;
+    console.log("start: ", start_idx, "end: ", end_idx);
+    if (depositIndexSynced % CHUNK_SIZE !== 0) {
+       const deposits = await depositService.range(start_idx, end_idx);
+       deposits.forEach((deposit)=>{
+        const addrU8Arr = bs58.decode(deposit.user_addr);
+        const amountByteArr = new anchor.BN(deposit.deposit_amount).toArray('le', 8);
+        const amountUint8Array = new Uint8Array(amountByteArr);
+        const totalU8Arr = new Uint8Array(amountUint8Array.length + addrU8Arr.length);
+        totalU8Arr.set(amountUint8Array);
+        totalU8Arr.set(addrU8Arr, amountUint8Array.length);
+        localTree.add_leaf(totalU8Arr);
+       })
+    }
+
     try{
         const listenDepositEvent = programL1.addEventListener("depositEvent", async (event, slot, _sig) => {
             const depositIndex = event.depositIndex.toNumber();
@@ -232,6 +251,9 @@ const listenEvent = async () => {
     }
 }
 
-relayerSync();
-listenEvent();
+const main = async () => {
+    const depositIndexSynced =await relayerSync();
+    listenEvent(depositIndexSynced);
+}
 
+main();
