@@ -33,12 +33,16 @@ pub mod counter_anchor {
     pub fn view_deposit_item<'info>(
         ctx: Context<'_, '_, 'info, 'info, View<'info>>, 
         deposit_index: u64, 
-    ) -> Result<[u8; 32]> {
+    ) -> Result<()> {
         let leaf_chunk_account = &ctx.accounts.leaf_chunk;
         msg!("deposit_index: {:?}", deposit_index);
-        msg!("leaf count: {:?}", leaf_chunk_account.leaf_hashes.len());
-        msg!("leaf hash: {:?}", leaf_chunk_account.leaf_hashes[deposit_index as usize % CHUNK_SIZE]);
-        Ok(leaf_chunk_account.leaf_hashes[deposit_index as usize % CHUNK_SIZE])
+        msg!("leaf count: {:?}", leaf_chunk_account.leafs.len());
+        let deposit_item = &leaf_chunk_account.leafs[deposit_index as usize % CHUNK_SIZE];
+        msg!("deposit_user:{:?}", deposit_item.deposit_info.user);
+        msg!("deposit_amount:{:?}", deposit_item.deposit_info.amount);
+        msg!("deposit_item_hash:{:?}", deposit_item.deposit_item_hash);
+        //Ok(leaf_chunk_account.leafs[deposit_index as usize % CHUNK_SIZE].clone())
+        Ok(())
     }
 
     // pub fn update_leaf_pda() -> Result<()> {
@@ -71,7 +75,7 @@ pub mod counter_anchor {
         let summary = &mut ctx.accounts.summary;
         let leaf_chunk_account = &mut ctx.accounts.leaf_chunk;
         
-        if leaf_chunk_account.leaf_hashes.len() >= CHUNK_SIZE {
+        if leaf_chunk_account.leafs.len() >= CHUNK_SIZE {
             return Err(ErrorCode::ChunkFull.into());
         }
 
@@ -87,15 +91,22 @@ pub mod counter_anchor {
         );
 
         let leaf_hash = DepositInfo{user: user.clone(), amount}.double_hash_array();
-        leaf_chunk_account.leaf_hashes.push(leaf_hash);
+        leaf_chunk_account.leafs.push(DepositItem { 
+            deposit_info: DepositInfo{
+                user: user.clone(), 
+                amount
+            }, 
+            deposit_item_hash: leaf_hash 
+        });
 
         let mut tree = MerkleTree::new(HashingAlgorithm::Sha256d, 32);
-        tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_chunk_account.leaf_hashes).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        //tree.add_hashes(<Vec<[u8; 32]> as Clone>::clone(&leaf_chunk_account.leafs).into_iter().map(|arr| arr.to_vec()).collect()).unwrap();
+        tree.add_hashes(leaf_chunk_account.leafs.iter().map(|item| item.deposit_item_hash.to_vec()).collect()).unwrap();
         tree.merklize().unwrap();
         let root = tree.get_merkle_root().unwrap();
         leaf_chunk_account.root = root.try_into().map_err(|_| "Conversion failed").unwrap();
 
-        let leaf_count: u64 = summary.load_mut()?.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leaf_hashes.len() as u64 - 1 ;
+        let leaf_count: u64 = summary.load_mut()?.leaf_chunk_count * CHUNK_SIZE as u64 + leaf_chunk_account.leafs.len() as u64 - 1 ;
         summary.load_mut()?.leaf_count = leaf_count;
         let clock = Clock::get()?;
         emit!(DepositEvent{
@@ -109,7 +120,7 @@ pub mod counter_anchor {
             leaf_account_pubkey: leaf_chunk_account.key(),
         });
 
-        if leaf_chunk_account.leaf_hashes.len() == CHUNK_SIZE {
+        if leaf_chunk_account.leafs.len() == CHUNK_SIZE {
             summary.load_mut()?.leaf_chunk_count += 1;
             leaf_chunk_account.is_fulled = true;
         }
@@ -222,11 +233,16 @@ pub struct IncreaseSummaryAccount<'info> {
 #[derive(InitSpace)]
 pub struct LeafChunkAccount {
     #[max_len(CHUNK_SIZE)]
-    pub leaf_hashes: Vec<[u8; 32]>,
+    pub leafs: Vec<DepositItem>,
     pub root: [u8; 32],
     pub is_fulled: bool,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq, InitSpace)]
+pub struct DepositItem {
+    pub deposit_info: DepositInfo,
+    pub deposit_item_hash: [u8; 32],
+}
 #[event]
 pub struct DepositEvent {
     pub slot: u64,
@@ -254,6 +270,8 @@ pub enum ErrorCode {
     #[msg("Insufficient Funds")]
     InsufficientFunds,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq, InitSpace)]
 pub struct DepositInfo {
     user: Pubkey,
     amount: u64,

@@ -18,7 +18,7 @@ describe('counter_anchor', () => {
   console.log("program id:", program.programId.toString())
 
   const secretKeyString = 
-  "[123,128,56,215,195,160,45,93,135,81,37,236,51,217,212,210,190,188,77,77,135,224,157,87,239,66,194,38,209,243,138,25,156,243,247,66,6,125,50,126,183,190,15,206,215,41,125,179,44,9,128,32,234,34,165,216,131,15,89,127,48,137,137,167]"
+  "[142,44,61,2,10,5,204,225,23,12,200,160,131,91,47,23,188,34,15,227,209,125,211,173,160,181,164,198,6,88,42,130,43,150,197,193,22,48,16,189,36,253,77,1,235,114,152,247,119,149,244,41,230,173,60,126,120,117,199,89,234,199,67,83]"
   const summaryKeypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(secretKeyString)))
   console.log("merkle tree account pubkey:", summaryKeypair.publicKey.toString())
 
@@ -46,30 +46,14 @@ describe('counter_anchor', () => {
 
     for (let i = 0; i < 14; i++) {
         await view(program, summaryKeypair, programWallet, payer, 2000, i);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        //await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-
-    // const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
-    // const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
-    // [
-    // Buffer.from("leaf"),
-    // summaryKeypair.publicKey.toBuffer(),
-    // new BN(0).toArrayLike(Buffer, 'le', 8)
-    // ],
-    // program.programId
-    // );
-    // console.log("comput pda1 str: ", leafPda[0].toString());
-    // console.log("comput pda1: ", leafPda[0].toBytes());
-    // let pda1 = summary.leafChunkAccounts.slice(0, 32);
-    // console.log("pda1: ", pda1.toString());
 
   });
 
 });
 
 async function view(program: Program<CounterAnchor>, summaryKeypair: Keypair, programWallet: Keypair, payer: anchor.Wallet, depositAmount: number, depositIndex: number) {
-  //const summary = await program.account.summaryAccount.fetch(summaryKeypair.publicKey);
-  //const chunkCount = summary.leafChunkCount;
   const leafPda = anchor.web3.PublicKey.findProgramAddressSync(
     [
     Buffer.from("leaf"),
@@ -78,6 +62,7 @@ async function view(program: Program<CounterAnchor>, summaryKeypair: Keypair, pr
   ],
     program.programId
   );
+  
   console.log("leaf pda: ", leafPda[0].toString());
   const simulateResponse = await program.methods.viewDepositItem(new BN(depositIndex))
     .accounts({ 
@@ -86,13 +71,34 @@ async function view(program: Program<CounterAnchor>, summaryKeypair: Keypair, pr
         leafChunk: leafPda[0],
     })
     .simulate();
-    const prefix = 'Program return: ';
-    let log = simulateResponse.raw.find((log) => log.startsWith(prefix));
-    log = log.slice(prefix.length);
-    const [_, data] = log.split(' ', 2);
-    console.log("data:", data);
-    const buffer = Buffer.from(data, 'base64');
-    const decimalArray = Array.from(buffer).map(byte => byte.toString(10));
-    console.log('decimalArray', decimalArray);
+
+    const [index, user, amount, hash] = parselog([...simulateResponse.raw]);
+    console.log("", index, "", user, " ", amount, " ", hash);
+    
 }
 
+const DEPOSITINDEXPREFIX = 'Program log: deposit_index:'
+const DEPOSITUSERPREFIX = 'Program log: deposit_user:'
+const DEPOSITAMOUNTPREFIX = 'Program log: deposit_amount:'
+const DEPOSITITEMHASH = 'Program log: deposit_item_hash:'
+function parselog(logs: string[]):[number, string, number, number[]]{
+    console.log("logs: ", logs);
+    let indexlog = logs.find((indexlog) => indexlog.startsWith(DEPOSITINDEXPREFIX));
+    indexlog = indexlog.slice(DEPOSITINDEXPREFIX.length);
+    console.log("index log: ", indexlog);
+
+    let userlog = logs.find((userlog) => userlog.startsWith(DEPOSITUSERPREFIX));
+    userlog = userlog.slice(DEPOSITUSERPREFIX.length);
+    console.log("user log: ", userlog);
+
+    let amountlog = logs.find((amountlog) => amountlog.startsWith(DEPOSITAMOUNTPREFIX));
+    amountlog = amountlog.slice(DEPOSITAMOUNTPREFIX.length);
+    console.log("amount log: ", amountlog);
+
+    let hashlog = logs.find((hashlog) => hashlog.startsWith(DEPOSITITEMHASH));
+    hashlog = hashlog.slice(DEPOSITITEMHASH.length);
+    console.log("hash log: ", hashlog);
+    const hash: number[] = JSON.parse(hashlog);
+
+    return [Number(indexlog),userlog, Number(amountlog), hash];
+}
