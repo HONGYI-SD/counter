@@ -38,12 +38,12 @@ class DepositService {
   }
 
   // get latest deposit item
-  async getLatestDepositItem(): Promise<number | null> {
+  async getLatestDepositItem(): Promise<number> {
     const result = await pool.query('SELECT MAX(deposit_index) FROM deposit');
     if (result.rows.length){
       return result.rows[0].max;
     }
-    return null;
+    return 0;
   }
   // 更新存款记录
   async updateDeposit(id: number, deposit: Deposit): Promise<Deposit | null> {

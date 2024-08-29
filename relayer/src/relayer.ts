@@ -61,13 +61,66 @@ const initRelayer = async () => {
     // todo: init db
 }
 
-const relayerSync = async () => {
-    const latestDepositIdxDB = depositService.getLatestDepositItem();
-    const l1SummaryAcc = programL1.account.summaryAccount.fetch(new anchor.web3.PublicKey(L2SUMMARYPUBKEY));
-    const latestDepositIdxChain = (await l1SummaryAcc).leafCount;
-    if (new anchor.BN(await latestDepositIdxDB) < latestDepositIdxChain) {
-        console.log("relayer is behind chain, wait syncing...");
+const DEPOSITINDEXPREFIX = 'Program log: deposit_index:'
+const DEPOSITUSERPREFIX = 'Program log: deposit_user:'
+const DEPOSITAMOUNTPREFIX = 'Program log: deposit_amount:'
+const DEPOSITITEMHASH = 'Program log: deposit_item_hash:'
+function parselog(logs: string[]):[number, string, number, number[]]{
+    console.log("logs: ", logs);
+    let indexlog = logs.find((indexlog) => indexlog.startsWith(DEPOSITINDEXPREFIX));
+    indexlog = indexlog.slice(DEPOSITINDEXPREFIX.length);
+    console.log("index log: ", indexlog);
 
+    let userlog = logs.find((userlog) => userlog.startsWith(DEPOSITUSERPREFIX));
+    userlog = userlog.slice(DEPOSITUSERPREFIX.length);
+    console.log("user log: ", userlog);
+
+    let amountlog = logs.find((amountlog) => amountlog.startsWith(DEPOSITAMOUNTPREFIX));
+    amountlog = amountlog.slice(DEPOSITAMOUNTPREFIX.length);
+    console.log("amount log: ", amountlog);
+
+    let hashlog = logs.find((hashlog) => hashlog.startsWith(DEPOSITITEMHASH));
+    hashlog = hashlog.slice(DEPOSITITEMHASH.length);
+    console.log("hash log: ", hashlog);
+    const hash: number[] = JSON.parse(hashlog);
+
+    return [Number(indexlog),userlog, Number(amountlog), hash];
+}
+
+const relayerSync = async () => {
+    while(true) {
+        const latestDepositIdxDB = await depositService.getLatestDepositItem();
+        console.log("local latest deposit index is: ", latestDepositIdxDB);
+        const l1SummaryAcc = programL1.account.summaryAccount.fetch(new anchor.web3.PublicKey(L1SUMMARYPUBKEY));
+        const latestDepositIdxChain = (await l1SummaryAcc).leafCount;
+        console.log("local latest deposit index is: ", latestDepositIdxDB);
+        console.log("on chain latest deposit index is: ", latestDepositIdxChain);
+        if (new anchor.BN(latestDepositIdxDB) === latestDepositIdxChain) {
+            console.log("there is no sync work");
+            break;
+        }
+        for (let index = new anchor.BN(latestDepositIdxDB); index < latestDepositIdxChain; index.add(new anchor.BN(1))) {
+            const leafChunk = anchor.web3.PublicKey.findProgramAddressSync(
+                [
+                Buffer.from("leaf"),
+                new anchor.web3.PublicKey(L1SUMMARYPUBKEY).toBuffer(),
+                new anchor.BN(index.toNumber() / CHUNK_SIZE).toArrayLike(Buffer, 'le', 8)
+              ],
+                programL1.programId
+            )[0];
+
+            const simulateResponse = await programL1.methods.viewDepositItem(index)
+            .accounts({ 
+                user: l1Payer.publicKey, 
+                summary: new anchor.web3.PublicKey(L1SUMMARYPUBKEY), 
+                leafChunk: leafChunk,
+            })
+            .simulate();
+
+            const [idx, user, amount, hash] = parselog([...simulateResponse.raw]);
+            console.log("", idx, "", user, " ", amount, " ", hash);
+
+        }
     }
 }
 
@@ -170,4 +223,6 @@ const listenEvent = async () => {
     }
 }
 
-listenEvent();
+//listenEvent();
+
+relayerSync();
